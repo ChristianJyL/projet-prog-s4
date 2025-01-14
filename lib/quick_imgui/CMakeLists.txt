@@ -31,8 +31,10 @@ endif()
 # ---Add GLFW---
 set(GLFW_BUILD_EXAMPLES OFF)
 set(GLFW_BUILD_TESTS OFF)
-set(GLFW_BUILD_DOCS OFF)
 set(GLFW_INSTALL OFF)
+set(GLFW_BUILD_DOCS OFF)
+set(GLFW_BUILD_WAYLAND OFF)
+set(GLFW_BUILD_X11 ON)
 add_subdirectory(lib/glfw)
 target_link_libraries(quick_imgui PUBLIC glfw)
 
