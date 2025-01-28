@@ -1,17 +1,15 @@
 #pragma once
 #include <imgui.h>
-#include <iostream>
 #include "Chess/Board.hpp"
-#include "quick_imgui/quick_imgui.hpp"
 
 class app {
 public:
     void run();
 
 private:
-    int   m_width{};
-    int   m_height{};
+    int   m_width{8};
+    int   m_height{8};
     Board m_board{};
 
-    void drawBoard();
+    void drawBoard(const std::vector<char>& board);
 };

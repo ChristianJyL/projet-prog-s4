@@ -1,11 +1,10 @@
 #pragma once
-
+#include <imgui.h>
 #include <vector>
 
 class Board {
 public:
-    std::vector<int> m_board;
-
-private:
-    void init();
+    std::vector<char> m_list;
+    Board();
+    ImVec4 getColor(char piece);
 };
