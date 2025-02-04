@@ -3,13 +3,11 @@
 #include "Chess/Board.hpp"
 
 class app {
+private:
+    Board m_board;
+
 public:
     void run();
-
-private:
-    int   m_width{8};
-    int   m_height{8};
-    Board m_board{};
-
-    void drawBoard(const std::vector<char>& board);
+    void handleClick(int x, int y);
+    void nextTurn();
 };
