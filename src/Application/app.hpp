@@ -8,6 +8,4 @@ private:
 
 public:
     void run();
-    void handleClick(int x, int y);
-    void nextTurn();
 };

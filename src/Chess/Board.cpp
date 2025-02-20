@@ -6,6 +6,7 @@
 constexpr ImVec4 COLOR_DARK_GREEN = ImVec4{0.0f, 0.39f, 0.0f, 1.0f}; // utiliser enum ?
 constexpr ImVec4 COLOR_BEIGE      = ImVec4{0.96f, 0.87f, 0.70f, 1.0f};
 
+// Color of the pieces
 ImVec4 Board::getColor(char piece)
 {
     if (piece >= 'a' && piece <= 'z')
@@ -18,65 +19,71 @@ ImVec4 Board::getColor(char piece)
     }
 }
 
+ImVec4 Board::getTileColor(bool isPairLine, int index) const
+{
+    return ((isPairLine && index % 2 == 0) || (!isPairLine && index % 2 != 0)) ? COLOR_DARK_GREEN : COLOR_BEIGE;
+}
+
+void Board::drawTile(int index, bool pairLine)
+{
+    // Determine if the tile should be highlighted
+    bool highlight = false;
+    if (m_selectedPiece)
+    {
+        char targetPiece = m_list.at(index);
+        if (targetPiece == 0 || (m_whiteTurn && targetPiece >= 'a' && targetPiece <= 'z') || (!m_whiteTurn && targetPiece >= 'A' && targetPiece <= 'Z'))
+        {
+            highlight = true;
+        }
+    }
+
+    // Push the appropriate button color
+    ImVec4 tileColor = getTileColor(pairLine, index);
+    if (highlight)
+    {
+        tileColor = ImVec4{0.0f, 1.0f, 0.0f, 1.0f}; // Highlight color
+    }
+    ImGui::PushStyleColor(ImGuiCol_Button, tileColor);
+
+    // Set piece-related colors and labels
+    std::string label(1, m_list.at(index));
+    ImVec4      pieceColor = getColor(m_list.at(index));
+
+    ImGui::PushID(index); // Assign unique ID for each square
+    ImGui::PushStyleColor(ImGuiCol_Text, pieceColor);
+
+    // Draw the button representing the square
+    ImGui::Button(label.c_str(), ImVec2{50.f, 50.f});
+
+    // Handle mouse interactions
+    handleMouseInteraction(index);
+
+    ImGui::PopStyleColor(); // Pop piece color
+    ImGui::PopID();         // Pop unique ID
+    ImGui::PopStyleColor(); // Pop tile color
+}
+
 void Board::drawBoard()
 {
-    bool pairLine = true;
     ImGui::Begin("Chess");
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0)); // Set item spacing to zero
+
+    bool pairLine = true;
+
     for (int i = 0; i < m_list.size(); ++i)
     {
-        if (i % 8 != 0)
-        {
-            ImGui::SameLine(); // Draw the next ImGui widget on the same line as the previous one. Otherwise it would be below it
-        }
-        else
+        if (i % 8 == 0)
         {
             pairLine = !pairLine;
         }
-
-        if (pairLine)
-        {
-            if (i % 2 == 0)
-            {
-                ImGui::PushStyleColor(ImGuiCol_Button, COLOR_DARK_GREEN); // Changes the color of all buttons until we call ImGui::PopStyleColor(). There is also ImGuiCol_ButtonActive and ImGuiCol_ButtonHovered
-            }
-            else
-            {
-                ImGui::PushStyleColor(ImGuiCol_Button, COLOR_BEIGE); // Changes the color of all buttons until we call ImGui::PopStyleColor(). There is also ImGuiCol_ButtonActive and ImGuiCol_ButtonHovered
-            }
-        }
         else
         {
-            if (i % 2 == 0)
-            {
-                ImGui::PushStyleColor(ImGuiCol_Button, COLOR_BEIGE); // Changes the color of all buttons until we call ImGui::PopStyleColor(). There is also ImGuiCol_ButtonActive and ImGuiCol_ButtonHovered
-            }
-            else
-            {
-                ImGui::PushStyleColor(ImGuiCol_Button, COLOR_DARK_GREEN); // Changes the color of all buttons until we call ImGui::PopStyleColor(). There is also ImGuiCol_ButtonActive and ImGuiCol_ButtonHovered
-            }
+            ImGui::SameLine();
         }
 
-        ImGui::PushID(i); // When some ImGui items have the same label (for exemple the next two buttons are labeled "Yo") ImGui needs you to specify an ID so that it can distinguish them. It can be an int, a pointer, a string, etc.
-                          // You will definitely run into this when you create a button for each of your chess pieces, so remember to give them an ID!
-        std::string label(1, m_list.at(i));
-        ImVec4      pieceColor = getColor(m_list.at(i));
-        ImGui::PushStyleColor(ImGuiCol_Text, pieceColor);
-        ImGui::Button(label.c_str(), ImVec2{50.f, 50.f});
-        if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
-        {
-            handleClick(i % 8, i / 8);
-        }
-        else if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
-        {
-            // Reset the board or handle right-click action
-            m_selectedPiece.reset();
-        }
-
-        ImGui::PopStyleColor();
-        ImGui::PopID(); // Then pop the id you pushed after you created the widget
-        ImGui::PopStyleColor();
+        drawTile(i, pairLine);
     }
+
     ImGui::PopStyleVar(); // Restore item spacing
     ImGui::End();
 }
@@ -97,6 +104,18 @@ void Board::move(Position from, Position to)
     set(from.x, from.y, 0);
 }
 
+void Board::handleMouseInteraction(int index)
+{
+    if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
+    {
+        handleClick(index % 8, index / 8);
+    }
+    else if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
+    {
+        m_selectedPiece.reset(); // Handle right-click action
+    }
+}
+
 void Board::handleClick(int x, int y)
 {
     char piece = get(x, y);
@@ -110,7 +129,6 @@ void Board::handleClick(int x, int y)
     else
     {
         Position from = *m_selectedPiece;
-
         // Si on clique sur une pièce du même joueur -> on sélectionne celle-ci à la place
         if (piece != 0 && ((m_whiteTurn && piece >= 'A' && piece <= 'Z') || (!m_whiteTurn && piece >= 'a' && piece <= 'z')))
         {

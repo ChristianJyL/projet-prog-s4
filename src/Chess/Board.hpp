@@ -10,17 +10,7 @@ struct Position {
 
 class Board {
 public:
-    ImVec4 getColor(char piece);
-    void   drawBoard();
-
-    char get(int x, int y);
-    void set(int x, int y, char piece);
-    void move(Position from, Position to);
-
-    void handleClick(int x, int y);
-    void selectPiece(int x, int y);
-    void movePiece(int x, int y);
-    void nextTurn();
+    void drawBoard();
 
 private:
     std::vector<char> m_list = {
@@ -35,4 +25,21 @@ private:
     };
     bool                    m_whiteTurn = true; // true = blanc, false = noir
     std::optional<Position> m_selectedPiece;    // Stocke la pièce sélectionnée
+
+    ImVec4 getTileColor(bool isPairLine, int index) const; // color of tiles
+    ImVec4 getColor(char piece);                           // Color of pieces
+
+    void drawTile(int index, bool pairLine);
+    void handleMouseInteraction(int index);
+
+    char get(int x, int y);
+    void set(int x, int y, char piece);
+    void move(Position from, Position to);
+
+    void handleClick(int x, int y);
+    void selectPiece(int x, int y);
+    void movePiece(int x, int y);
+    void nextTurn();
+
+    void showPossibleMoves();
 };
