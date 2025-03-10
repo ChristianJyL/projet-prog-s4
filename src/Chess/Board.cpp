@@ -1,72 +1,118 @@
 #include "Board.hpp"
 #include <imgui.h>
+#include <array>
+#include <iostream>
 #include <string>
 #include <vector>
 
 constexpr ImVec4 COLOR_DARK_GREEN = ImVec4{0.0f, 0.39f, 0.0f, 1.0f}; // utiliser enum ?
 constexpr ImVec4 COLOR_BEIGE      = ImVec4{0.96f, 0.87f, 0.70f, 1.0f};
 
-// Color of the pieces
-ImVec4 Board::getColor(char piece)
-{
-    if (piece >= 'a' && piece <= 'z')
-    {
-        return {0.0f, 0.0f, 0.0f, 1.0f}; // black
-    }
-    else
-    {
-        return {1.0f, 1.0f, 1.0f, 1.0f}; // white
-    }
+
+Board::Board() {
+    initializeBoard();
 }
+
+void Board::initializeBoard() {
+    // Initialisation des pièces blanches
+std::array<PieceType, 8> Pieces = {PieceType::Rook, PieceType::Knight, PieceType::Bishop, PieceType::Queen, PieceType::King, PieceType::Bishop, PieceType::Knight, PieceType::Rook};
+for (int i = 0; i < 8; ++i) {
+    m_list[i] = {Pieces[i], PieceColor::White};
+    m_list[i + 8] = {PieceType::Pawn, PieceColor::White};
+}
+// Initialisation des pièces noires
+for (int i = 0; i < 8; ++i) {
+    m_list[56 + i] = {Pieces[i], PieceColor::Black};
+    m_list[48 + i] = {PieceType::Pawn, PieceColor::Black};
+}
+}
+
+Piece Board::get(Position pos) const {
+    return m_list.at(pos.x + pos.y * 8);
+}
+
+void Board::set(Position pos, Piece piece) {
+    m_list.at(pos.x + pos.y * 8) = piece;
+}
+
+void Board::move(Position from, Position to) {
+    set(to, get(from));
+    set(from, {PieceType::None, PieceColor::White});
+}
+
+
 
 ImVec4 Board::getTileColor(bool isPairLine, int index) const
 {
     return ((isPairLine && index % 2 == 0) || (!isPairLine && index % 2 != 0)) ? COLOR_DARK_GREEN : COLOR_BEIGE;
 }
 
-void Board::drawTile(int index, bool pairLine)
+ImVec4 Board::getPieceColor(Piece piece) const
 {
-    // Determine if the tile should be highlighted
-    bool highlight = false;
-    if (m_selectedPiece)
-    {
-        char targetPiece = m_list.at(index);
-        if (targetPiece == 0 || (m_whiteTurn && targetPiece >= 'a' && targetPiece <= 'z') || (!m_whiteTurn && targetPiece >= 'A' && targetPiece <= 'Z'))
-        {
-            highlight = true;
-        }
-    }
+    return (piece.color == PieceColor::White) ? ImVec4{1.0f, 1.0f, 1.0f, 1.0f} : ImVec4{0.0f, 0.0f, 0.0f, 1.0f};
+}
 
-    // Push the appropriate button color
+
+
+
+
+void Board::drawTile(int index, bool pairLine, ImVec2& outCursorPos)
+{
+    Position pos = {index % 8, index / 8};
+
+    // Définition de la couleur de la case
     ImVec4 tileColor = getTileColor(pairLine, index);
-    if (highlight)
-    {
-        tileColor = ImVec4{0.0f, 1.0f, 0.0f, 1.0f}; // Highlight color
-    }
     ImGui::PushStyleColor(ImGuiCol_Button, tileColor);
 
-    // Set piece-related colors and labels
-    std::string label(1, m_list.at(index));
-    ImVec4      pieceColor = getColor(m_list.at(index));
+    // Récupération de la pièce
+    Piece piece = m_list.at(index);
+    std::string label = std::string(1, piece.toChar());
+    ImVec4 pieceColor = getPieceColor(piece);
 
-    ImGui::PushID(index); // Assign unique ID for each square
+    ImGui::PushID(index);
     ImGui::PushStyleColor(ImGuiCol_Text, pieceColor);
 
-    // Draw the button representing the square
-    ImGui::Button(label.c_str(), ImVec2{50.f, 50.f});
+    // Stocker la position actuelle du curseur avant d'afficher le bouton
+    outCursorPos = ImGui::GetCursorScreenPos();
 
-    // Handle mouse interactions
+    // Taille du bouton
+    ImVec2 buttonSize = ImVec2{50.f, 50.f};
+
+    // Dessiner le bouton de la case
+    ImGui::Button(label.c_str(), buttonSize);
+
+    // Gestion des interactions souris
     handleMouseInteraction(index);
 
-    ImGui::PopStyleColor(); // Pop piece color
-    ImGui::PopID();         // Pop unique ID
-    ImGui::PopStyleColor(); // Pop tile color
+    ImGui::PopStyleColor();
+    ImGui::PopID();
+    ImGui::PopStyleColor();
+}
+
+void Board::drawPossibleMoves(Position pos, ImVec2 cursorPos)
+{
+    if (!m_selectedPiece) return;
+
+    Piece selectedPiece = get(*m_selectedPiece);
+    if (selectedPiece.type == PieceType::None) return;
+
+    // Vérifier si la case est un déplacement valide
+    for (const Position& move : selectedPiece.getValidMoves(*m_selectedPiece)) {
+        if (move.x == pos.x && move.y == pos.y) {
+            ImGui::GetWindowDrawList()->AddCircleFilled(
+                ImVec2(cursorPos.x + 25, cursorPos.y + 25), // Centre du bouton
+                10.0f, // Taille du cercle
+                IM_COL32(0, 255, 0, 150) // Vert semi-transparent
+            );
+            break;
+        }
+    }
 }
 
 void Board::drawBoard()
 {
     ImGui::Begin("Chess");
-    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0)); // Set item spacing to zero
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
 
     bool pairLine = true;
 
@@ -81,34 +127,25 @@ void Board::drawBoard()
             ImGui::SameLine();
         }
 
-        drawTile(i, pairLine);
+        Position pos = {i % 8, i / 8};
+        ImVec2 cursorPos;
+
+        drawTile(i, pairLine, cursorPos); // Dessine la case et récupère sa position
+        drawPossibleMoves(pos, cursorPos); // Affiche les déplacements possibles
     }
 
-    ImGui::PopStyleVar(); // Restore item spacing
+    ImGui::PopStyleVar();
     ImGui::End();
 }
 
-char Board::get(int x, int y)
-{
-    return m_list.at(x + y * 8);
-}
-void Board::set(int x, int y, char piece)
-{
-    m_list.at(x + y * 8) = piece;
-}
 
-void Board::move(Position from, Position to)
-{
-    char piece = get(from.x, from.y);
-    set(to.x, to.y, piece);
-    set(from.x, from.y, 0);
-}
+
 
 void Board::handleMouseInteraction(int index)
 {
     if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
     {
-        handleClick(index % 8, index / 8);
+        handleClick(Position{index % 8, index / 8});
     }
     else if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
     {
@@ -116,62 +153,70 @@ void Board::handleMouseInteraction(int index)
     }
 }
 
-void Board::handleClick(int x, int y)
+void Board::handleClick(Position pos)
 {
-    char piece = get(x, y);
-
+    Piece piece = get(pos);
     // Si aucune pièce n'est sélectionnée, on essaye de sélectionner
     if (!m_selectedPiece)
     {
-        selectPiece(x, y);
+        selectPiece(pos);
     }
     // Si une pièce est déjà sélectionnée
     else
     {
         Position from = *m_selectedPiece;
         // Si on clique sur une pièce du même joueur -> on sélectionne celle-ci à la place
-        if (piece != 0 && ((m_whiteTurn && piece >= 'A' && piece <= 'Z') || (!m_whiteTurn && piece >= 'a' && piece <= 'z')))
+        if (piece.type != PieceType::None && ((m_turn == PieceColor::White && piece.color == PieceColor::White) || (m_turn == PieceColor::Black && piece.color == PieceColor::Black)))
         {
-            selectPiece(x, y);
+            selectPiece(pos);
         }
         // Sinon, on tente un déplacement (vide ou capture)
         else
         {
-            movePiece(x, y);
+            movePiece(pos);
         }
     }
 }
 
-void Board::selectPiece(int x, int y)
+void Board::selectPiece(Position pos)
 {
-    char piece = get(x, y);
+    Piece piece = get(pos);
 
     // Vérifier que la pièce appartient au joueur actif
-    if (piece != 0 && ((m_whiteTurn && piece >= 'A' && piece <= 'Z') || (!m_whiteTurn && piece >= 'a' && piece <= 'z')))
+    if (piece.type != PieceType::None && ((m_turn == PieceColor::White && piece.color == PieceColor::White) || (m_turn == PieceColor::Black && piece.color == PieceColor::Black)))
     {
-        m_selectedPiece = Position{.x = x, .y = y};
+        m_selectedPiece = pos;
     }
 }
 
-void Board::movePiece(int x, int y)
+void Board::movePiece(Position pos)
 {
-    if (!m_selectedPiece)
+    if (!m_selectedPiece) return;
+
+    Position from = *m_selectedPiece;
+    Piece piece = get(from);
+    Piece targetPiece = get(pos);
+
+    // Vérifier si c'est le premier déplacement du pion
+    bool isFirstMove = (piece.type == PieceType::Pawn && (from.y == 1 || from.y == 6));
+
+    // Vérifier si le déplacement est valide
+    if (!piece.isMoveValid(from, pos, isFirstMove)) {
+        m_selectedPiece.reset(); // Annuler la sélection
         return;
-
-    char targetPiece = get(x, y);
-
-    // Vérifier si on essaie de capturer une pièce ennemie ou d'aller sur une case vide
-    if (targetPiece == 0 || (m_whiteTurn && targetPiece >= 'a' && targetPiece <= 'z') || (!m_whiteTurn && targetPiece >= 'A' && targetPiece <= 'Z'))
-    {
-        move(*m_selectedPiece, Position{.x = x, .y = y});
-        nextTurn();
     }
 
-    // Désélectionner la pièce après le coup
-    m_selectedPiece.reset();
+    // Vérifier si la case est occupée par une pièce adverse ou libre
+    if (targetPiece.type == PieceType::None || targetPiece.color != piece.color) {
+        set(pos, piece); // Déplacer la pièce
+        set(from, {PieceType::None, PieceColor::White}); // Vider l'ancienne case
+        nextTurn(); // Changer le tour
+    }
+
+    m_selectedPiece.reset(); // Désélectionner la pièce après le déplacement
 }
 
 void Board::nextTurn()
 {
-    m_whiteTurn = !m_whiteTurn;
+    m_turn = (m_turn == PieceColor::White) ? PieceColor::Black : PieceColor::White;
 }

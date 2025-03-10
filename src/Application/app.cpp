@@ -9,9 +9,11 @@ void app::run()
 {
     quick_imgui::loop(
         "Chess",
-        /* init: */ [&]() {},
+        /* init: */ [&]() {
+        m_board = Board();    
+        },
         /* loop: */
-        [&]() {
+        [&]() { 
             m_board.drawBoard();
         }
     );
