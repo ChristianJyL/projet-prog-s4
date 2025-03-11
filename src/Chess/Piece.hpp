@@ -1,4 +1,5 @@
 #pragma once
+#include <cmath>
 
 enum class PieceType {
     None,
@@ -18,6 +19,8 @@ enum class PieceColor {
 struct Piece {
     PieceType type;
     PieceColor color;
+    bool hasMoved = false;
+
 
     bool isEmpty() const { return type == PieceType::None; }
 
@@ -33,7 +36,7 @@ struct Piece {
         }
     }
 
-    bool isMoveValid(Position from, Position to, bool isFirstMove) const {
+    bool isMoveValid(Position from, Position to) const {
         int dx = to.x - from.x;
         int dy = to.y - from.y;
 
@@ -45,6 +48,12 @@ struct Piece {
             if (dx == 0 && dy == direction) {
                 return true;
             }
+
+            // Avance de deux cases si c'est le premier mouvement
+            if (!hasMoved && dx == 0 && dy == 2 * direction) {
+                return true;
+            }
+
             return false;
         }
 
@@ -52,7 +61,7 @@ struct Piece {
             return (dx == 0 || dy == 0); // Déplacement en ligne droite
 
         case PieceType::Knight:
-            return (dx * dy == 2); // Mouvement en L
+            return ( (abs(dx) == 2 && abs(dy) == 1) || (abs(dx) == 1 && abs(dy) == 2) ); // Déplacement en "L"
 
         case PieceType::Bishop:
             return (abs(dx) == abs(dy)); // Déplacement en diagonale
@@ -68,21 +77,8 @@ struct Piece {
         }
     }
 
-    std::vector<Position> getValidMoves(Position from) const {
-        std::vector<Position> moves;
 
-        for (int dx = -7; dx <= 7; ++dx) {
-            for (int dy = -7; dy <= 7; ++dy) {
-                Position to = {from.x + dx, from.y + dy};
 
-                if (to.isValid() && isMoveValid(from, to, false)) {
-                    moves.push_back(to);
-                }
-            }
-        }
-
-        return moves;
-    }
 
 
 };

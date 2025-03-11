@@ -34,5 +34,9 @@ private:
     void movePiece(Position pos);
     void nextTurn();
 
+    bool isPathClear(Position from, Position to) const;
+    std::vector<Position> getValidMoves(Position from) const ;
+
+
     void drawPossibleMoves(Position pos, ImVec2 cursorPos);
 };
