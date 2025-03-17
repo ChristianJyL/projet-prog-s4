@@ -8,39 +8,43 @@
 constexpr ImVec4 COLOR_DARK_GREEN = ImVec4{0.0f, 0.39f, 0.0f, 1.0f}; // utiliser enum ?
 constexpr ImVec4 COLOR_BEIGE      = ImVec4{0.96f, 0.87f, 0.70f, 1.0f};
 
-
-Board::Board() {
+Board::Board()
+{
     initializeBoard();
 }
 
-void Board::initializeBoard() {
+void Board::initializeBoard()
+{
     // Initialisation des pièces blanches
-std::array<PieceType, 8> Pieces = {PieceType::Rook, PieceType::Knight, PieceType::Bishop, PieceType::Queen, PieceType::King, PieceType::Bishop, PieceType::Knight, PieceType::Rook};
-for (int i = 0; i < 8; ++i) {
-    m_list[i] = {Pieces[i], PieceColor::White};
-    m_list[i + 8] = {PieceType::Pawn, PieceColor::White};
-}
-// Initialisation des pièces noires
-for (int i = 0; i < 8; ++i) {
-    m_list[56 + i] = {Pieces[i], PieceColor::Black};
-    m_list[48 + i] = {PieceType::Pawn, PieceColor::Black};
-}
+    std::array<PieceType, 8> Pieces = {PieceType::Rook, PieceType::Knight, PieceType::Bishop, PieceType::Queen, PieceType::King, PieceType::Bishop, PieceType::Knight, PieceType::Rook};
+    for (int i = 0; i < 8; ++i)
+    {
+        m_list[i]     = {Pieces[i], PieceColor::White};
+        m_list[i + 8] = {PieceType::Pawn, PieceColor::White};
+    }
+    // Initialisation des pièces noires
+    for (int i = 0; i < 8; ++i)
+    {
+        m_list[56 + i] = {Pieces[i], PieceColor::Black};
+        m_list[48 + i] = {PieceType::Pawn, PieceColor::Black};
+    }
 }
 
-Piece Board::get(Position pos) const {
+Piece Board::get(Position pos) const
+{
     return m_list.at(pos.x + pos.y * 8);
 }
 
-void Board::set(Position pos, Piece piece) {
+void Board::set(Position pos, Piece piece)
+{
     m_list.at(pos.x + pos.y * 8) = piece;
 }
 
-void Board::move(Position from, Position to) {
+void Board::move(Position from, Position to)
+{
     set(to, get(from));
     set(from, {PieceType::None, PieceColor::White});
 }
-
-
 
 ImVec4 Board::getTileColor(bool isPairLine, int index) const
 {
@@ -52,10 +56,6 @@ ImVec4 Board::getPieceColor(Piece piece) const
     return (piece.color == PieceColor::White) ? ImVec4{1.0f, 1.0f, 1.0f, 1.0f} : ImVec4{0.0f, 0.0f, 0.0f, 1.0f};
 }
 
-
-
-
-
 void Board::drawTile(int index, bool pairLine, ImVec2& outCursorPos)
 {
     Position pos = {index % 8, index / 8};
@@ -65,9 +65,9 @@ void Board::drawTile(int index, bool pairLine, ImVec2& outCursorPos)
     ImGui::PushStyleColor(ImGuiCol_Button, tileColor);
 
     // Récupération de la pièce
-    Piece piece = m_list.at(index);
-    std::string label = std::string(1, piece.toChar());
-    ImVec4 pieceColor = getPieceColor(piece);
+    Piece       piece      = m_list.at(index);
+    std::string label      = std::string(1, piece.toChar());
+    ImVec4      pieceColor = getPieceColor(piece);
 
     ImGui::PushID(index);
     ImGui::PushStyleColor(ImGuiCol_Text, pieceColor);
@@ -91,18 +91,22 @@ void Board::drawTile(int index, bool pairLine, ImVec2& outCursorPos)
 
 void Board::drawPossibleMoves(Position pos, ImVec2 cursorPos)
 {
-    if (!m_selectedPiece) return;
+    if (!m_selectedPiece)
+        return;
 
     Piece selectedPiece = get(*m_selectedPiece);
-    if (selectedPiece.type == PieceType::None) return;
+    if (selectedPiece.type == PieceType::None)
+        return;
 
     // Vérifier si la case est un déplacement valide
-    for (const Position& move : getValidMoves(*m_selectedPiece)) {
-        if (move.x == pos.x && move.y == pos.y) {
+    for (const Position& move : getValidMoves(*m_selectedPiece))
+    {
+        if (move.x == pos.x && move.y == pos.y)
+        {
             ImGui::GetWindowDrawList()->AddCircleFilled(
                 ImVec2(cursorPos.x + 25, cursorPos.y + 25), // Centre du bouton
-                10.0f, // Taille du cercle
-                IM_COL32(0, 255, 0, 150) // Vert semi-transparent
+                10.0f,                                      // Taille du cercle
+                IM_COL32(0, 255, 0, 150)                    // Vert semi-transparent
             );
             break;
         }
@@ -128,18 +132,15 @@ void Board::drawBoard()
         }
 
         Position pos = {i % 8, i / 8};
-        ImVec2 cursorPos;
+        ImVec2   cursorPos;
 
-        drawTile(i, pairLine, cursorPos); // Dessine la case et récupère sa position
+        drawTile(i, pairLine, cursorPos);  // Dessine la case et récupère sa position
         drawPossibleMoves(pos, cursorPos); // Affiche les déplacements possibles
     }
 
     ImGui::PopStyleVar();
     ImGui::End();
 }
-
-
-
 
 void Board::handleMouseInteraction(int index)
 {
@@ -189,7 +190,8 @@ void Board::selectPiece(Position pos)
     }
 }
 
-bool Board::isPathClear(Position from, Position to) const {
+bool Board::isPathClear(Position from, Position to) const
+{
     int dx = to.x - from.x;
     int dy = to.y - from.y;
 
@@ -200,8 +202,10 @@ bool Board::isPathClear(Position from, Position to) const {
     checkPos.x += stepX;
     checkPos.y += stepY;
 
-    while (checkPos.x != to.x || checkPos.y != to.y) {
-        if (!checkPos.isValid() || get(checkPos).type != PieceType::None) {
+    while (checkPos.x != to.x || checkPos.y != to.y)
+    {
+        if (!checkPos.isValid() || get(checkPos).type != PieceType::None)
+        {
             return false; // Une pièce bloque le passage
         }
         checkPos.x += stepX;
@@ -213,31 +217,34 @@ bool Board::isPathClear(Position from, Position to) const {
 
 void Board::movePiece(Position pos)
 {
-    if (!m_selectedPiece) return;
+    if (!m_selectedPiece)
+        return;
 
-    Position from = *m_selectedPiece;
-    Piece piece = get(from);
-    Piece targetPiece = get(pos);
+    Position from        = *m_selectedPiece;
+    Piece    piece       = get(from);
+    Piece    targetPiece = get(pos);
 
     // Vérifier si le déplacement est valide
-    if (!piece.isMoveValid(from, pos)) {
+    if (!piece.isMoveValid(from, pos))
+    {
         m_selectedPiece.reset(); // Annuler la sélection
         return;
     }
 
     // Vérifier s'il y a un obstacle (uniquement pour Tour, Fou, et Reine)
-    if ((piece.type == PieceType::Rook || piece.type == PieceType::Bishop || piece.type == PieceType::Queen) &&
-        !isPathClear(from, pos)) {
+    if ((piece.type == PieceType::Rook || piece.type == PieceType::Bishop || piece.type == PieceType::Queen) && !isPathClear(from, pos))
+    {
         m_selectedPiece.reset();
         return;
-        }
+    }
 
     // Vérifier si la case est occupée par une pièce adverse ou libre
-    if (targetPiece.type == PieceType::None || targetPiece.color != piece.color) {
-        piece.hasMoved = true; // Marquer la pièce comme ayant bougé
-        set(pos, piece); // Déplacer la pièce
+    if (targetPiece.type == PieceType::None || targetPiece.color != piece.color)
+    {
+        piece.hasMoved = true;                           // Marquer la pièce comme ayant bougé
+        set(pos, piece);                                 // Déplacer la pièce
         set(from, {PieceType::None, PieceColor::White}); // Vider l'ancienne case
-        nextTurn(); // Changer le tour
+        nextTurn();                                      // Changer le tour
     }
 
     m_selectedPiece.reset(); // Désélectionner la pièce après le déplacement
@@ -248,20 +255,41 @@ void Board::nextTurn()
     m_turn = (m_turn == PieceColor::White) ? PieceColor::Black : PieceColor::White;
 }
 
-std::vector<Position> Board::getValidMoves(Position from) const {
+std::vector<Position> Board::getValidMoves(Position from) const
+{
     std::vector<Position> moves;
-    Piece piece = get(from);
-    if (piece.type == PieceType::None) return moves;
+    Piece                 piece = get(from);
+    if (piece.type == PieceType::None)
+        return moves;
 
-    for (int x = 0; x < 8; ++x) {
-        for (int y = 0; y < 8; ++y) {
+    for (int x = 0; x < 8; ++x)
+    {
+        for (int y = 0; y < 8; ++y)
+        {
             Position to = {x, y};
-            if (!piece.isMoveValid(from, to)) continue;
-            if ((piece.type == PieceType::Rook || piece.type == PieceType::Bishop || piece.type == PieceType::Queen) && !isPathClear(from, to)) continue;
+            if (!piece.isMoveValid(from, to))
+                continue;
             Piece targetPiece = get(to);
-            if (targetPiece.type == PieceType::None || targetPiece.color != piece.color) moves.push_back(to);
+
+            // Vérifier les captures pour le pion
+            if (piece.type == PieceType::Pawn && abs(to.x - from.x) == 1)
+            {
+                if (targetPiece.type == PieceType::None || targetPiece.color == piece.color)
+                    continue;
+            }
+
+            // Vérifier les obstacles pour la Tour, le Fou et la Reine
+            if ((piece.type == PieceType::Rook || piece.type == PieceType::Bishop || piece.type == PieceType::Queen) && !isPathClear(from, to))
+            {
+                continue; // Bloqué par une autre pièce
+            }
+
+            // Empêcher de se déplacer sur une pièce alliée
+            if (targetPiece.type == PieceType::None || targetPiece.color != piece.color)
+            {
+                moves.push_back(to);
+            }
         }
     }
     return moves;
 }
-
