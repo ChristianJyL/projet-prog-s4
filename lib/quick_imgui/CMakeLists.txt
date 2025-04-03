@@ -41,6 +41,10 @@ add_library(glad lib/glad/src/glad.c)
 target_include_directories(glad SYSTEM PUBLIC lib/glad/include)
 target_link_libraries(quick_imgui PUBLIC glad)
 
+# ---add glm---
+add_subdirectory(lib/glm)
+target_link_libraries(quick_imgui PUBLIC glm)
+
 # ---Add Dear ImGui---
 add_library(ImGui)
 target_sources(ImGui PRIVATE
@@ -51,6 +55,8 @@ target_sources(ImGui PRIVATE
     lib/imgui/imgui.cpp
     lib/imgui/misc/cpp/imgui_stdlib.cpp
 )
+
+
 target_include_directories(ImGui SYSTEM PUBLIC lib/imgui)
 target_compile_features(ImGui PUBLIC cxx_std_11)
 
