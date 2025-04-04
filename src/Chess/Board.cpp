@@ -8,11 +8,6 @@
 constexpr ImVec4 COLOR_DARK_GREEN = ImVec4{0.0f, 0.39f, 0.0f, 1.0f}; // utiliser enum ?
 constexpr ImVec4 COLOR_BEIGE      = ImVec4{0.96f, 0.87f, 0.70f, 1.0f};
 
-Board::Board()
-{
-    initializeBoard();
-}
-
 void Board::initializeBoard()
 {
     // Initialisation des pièces blanches

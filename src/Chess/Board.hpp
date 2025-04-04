@@ -7,7 +7,7 @@
 
 class Board {
 public:
-    Board();
+    void initializeBoard();
     Piece      get(Position pos) const;
     void       set(Position pos, Piece piece);
     void       move(Position from, Position to);
@@ -21,7 +21,7 @@ private:
     PieceColor         m_winner   = PieceColor::White; // Default winner, will be set when game ends
     bool               m_gameOver = false;
 
-    void initializeBoard();
+    
 
     std::optional<Position> m_selectedPiece;      // Stocke la pièce sélectionnée
     std::optional<Position> m_lastDoublePawnMove; // Stocke la position finale du dernier pion ayant avancé de deux cases
