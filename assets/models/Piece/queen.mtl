@@ -1,0 +1,18 @@
+# Blender 4.2.1 LTS MTL File: 'None'
+# www.blender.org
+
+newmtl lambert1.006
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 3
+Pm 0.100000
+Ps 0.000000
+Pc 0.000000
+Pcr 0.030000
+aniso 0.000000
+anisor 0.000000
+Tf 0.100000 0.100000 0.100000
+map_Kd C:/Users/anton/Documents/GitHub/projet-prog-s4/assets/models/bar-glasses/source/bar_glasses/bar_glasses_color.png
+map_Pr C:/Users/anton/Documents/GitHub/projet-prog-s4/assets/models/bar-glasses/textures/bar_glasses_rough.png
