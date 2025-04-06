@@ -4,9 +4,16 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include "../3Dengine/Renderer3D.hpp" // Inclure le Renderer3D
 
 constexpr ImVec4 COLOR_DARK_GREEN = ImVec4{0.0f, 0.39f, 0.0f, 1.0f}; // utiliser enum ?
 constexpr ImVec4 COLOR_BEIGE      = ImVec4{0.96f, 0.87f, 0.70f, 1.0f};
+
+void Board::updateRenderer3D() {
+    if (m_renderer3D != nullptr) {
+        m_renderer3D->updatePiecesFromBoard(*this);
+    }
+}
 
 void Board::initializeBoard()
 {
@@ -26,6 +33,12 @@ void Board::initializeBoard()
 
     // Réinitialiser le suivi du dernier mouvement de pion double
     m_lastDoublePawnMove.reset();
+    
+    // Notifier les observateurs de l'initialisation de l'échiquier
+    notifyBoardChanged();
+
+    // Mettre à jour le rendu 3D
+    updateRenderer3D();
 }
 
 Piece Board::get(Position pos) const
@@ -42,6 +55,9 @@ void Board::move(Position from, Position to)
 {
     set(to, get(from));
     set(from, {PieceType::None, PieceColor::White});
+    
+    // Mettre à jour le rendu 3D après le mouvement
+    updateRenderer3D();
 }
 
 ImVec4 Board::getTileColor(bool isPairLine, int index) const
@@ -358,6 +374,12 @@ void Board::movePiece(Position pos)
             m_lastDoublePawnMove.reset(); // Réinitialiser pour tout autre mouvement
         }
 
+        // Notifier les observateurs du changement d'état
+        notifyBoardChanged();
+
+        // Mettre à jour le rendu 3D après le mouvement
+        updateRenderer3D();
+
         // Vérifier si le pion doit être promu
         if (isPawnPromotion(from, pos, piece))
         {
@@ -406,6 +428,12 @@ void Board::handlePawnPromotion()
             {
                 // Promouvoir le pion en la pièce choisie
                 set(m_promotionPosition, {type, m_promotionColor});
+
+                // Mettre à jour le rendu 3D après la promotion
+                updateRenderer3D();
+
+                // Notifier les observateurs du changement d'état
+                notifyBoardChanged();
 
                 // Réinitialiser l'état de promotion
                 m_promotionInProgress = false;
@@ -484,4 +512,11 @@ std::vector<Position> Board::getValidMoves(Position from) const
         }
     }
     return moves;
+}
+
+void Board::notifyBoardChanged() {
+    // Appeler tous les callbacks enregistrés
+    for (const auto& callback : m_changeCallbacks) {
+        callback(*this);
+    }
 }

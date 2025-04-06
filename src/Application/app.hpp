@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Chess/Board.hpp"
-#include "3DRenderer/Renderer3D.hpp"
+#include "3Dengine/Renderer3D.hpp"
 
 class app {
 public:
