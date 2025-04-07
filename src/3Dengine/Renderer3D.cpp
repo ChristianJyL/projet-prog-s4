@@ -3,6 +3,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <fstream>
+#include "../Chess/Board.hpp"
 
 Renderer3D::Renderer3D() 
     : m_skybox(nullptr), m_chessboard(nullptr), m_pieceRenderer(nullptr), m_isInitialized(false)
@@ -180,6 +181,11 @@ bool Renderer3D::isInitialized() const {
 
 void Renderer3D::update(float deltaTime) {
     m_camera.update(deltaTime);
+    
+    // Mettre à jour les animations des pièces
+    if (m_pieceRenderer) {
+        m_pieceRenderer->update(deltaTime);
+    }
 }
 
 void Renderer3D::cleanup() {
@@ -224,11 +230,8 @@ void Renderer3D::render() {
         std::cerr << "OpenGL error before rendering: 0x" << std::hex << err << std::dec << std::endl;
     }
     
-    // Ordre de rendu: d'abord l'échiquier, puis les pièces, puis la skybox
-    
     // Rendre l'échiquier 3D
     if (m_chessboard) {
-        std::cout << "Rendering chessboard..." << std::endl;
         m_chessboard->render(viewMatrix, projectionMatrix);
     } else {
         std::cerr << "WARNING: Chessboard is null in render() method" << std::endl;
@@ -236,7 +239,6 @@ void Renderer3D::render() {
     
     // Rendre les pièces d'échecs
     if (m_pieceRenderer && m_chessboard) {
-        std::cout << "Rendering chess pieces..." << std::endl;
         m_pieceRenderer->render(viewMatrix, projectionMatrix, m_chessboard->getSquareSize());
     } else {
         std::cerr << "WARNING: PieceRenderer or Chessboard is null in render() method" << std::endl;
@@ -266,11 +268,8 @@ void Renderer3D::updatePiecesFromBoard(const Board& board) {
     // Récupérer l'état complet de l'échiquier
     const std::vector<Piece>& boardState = board.getBoardState();
     
-    // Effacer toutes les pièces actuelles du renderer
-    m_pieceRenderer->clearPieces();
-    
-    // Compteur de pièces ajoutées pour debug
-    int pieceCount = 0;
+    // Créer le nouvel état pour l'animation
+    std::vector<ChessPiece> newState;
     
     // Parcourir toutes les positions de l'échiquier
     for (int y = 0; y < 8; y++) {
@@ -281,17 +280,24 @@ void Renderer3D::updatePiecesFromBoard(const Board& board) {
             // Récupérer la pièce à cette position
             Piece piece = boardState[index];
             
-            // Si la case n'est pas vide, ajouter la pièce au renderer
+            // Si la case n'est pas vide, ajouter la pièce au nouvel état
             if (piece.type != PieceType::None) {
-                m_pieceRenderer->addPiece(piece.type, piece.color, x, y);
-                pieceCount++;
-                std::cout << "Ajout d'une pièce de type " << static_cast<int>(piece.type) 
-                          << " en position (" << x << "," << y << ")" << std::endl;
+                ChessPiece chessPiece;
+                chessPiece.type = piece.type;
+                chessPiece.color = piece.color;
+                chessPiece.x = x;
+                chessPiece.y = y;
+                
+                newState.push_back(chessPiece);
             }
         }
     }
     
-    std::cout << "Total de " << pieceCount << " pièces ajoutées au rendu 3D" << std::endl;
+    // Animer la transition vers le nouvel état
+    if (m_pieceRenderer) {
+        m_pieceRenderer->animateTransition(newState, 1.0f);
+    }
+
 }
 
 glm::vec3 Renderer3D::getChessBoardPosition(int x, int y) const {
@@ -310,4 +316,3 @@ glm::vec3 Renderer3D::getChessBoardPosition(int x, int y) const {
     
     return glm::vec3(xPos, yPos, zPos); // y = hauteur des cases
 }
-

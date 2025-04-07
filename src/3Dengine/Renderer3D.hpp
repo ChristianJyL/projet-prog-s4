@@ -28,6 +28,7 @@ public:
     // Obtenir la position 3D d'une case de l'échiquier
     glm::vec3 getChessBoardPosition(int x, int y) const;
     
+    
 private:
     // Caméra standard
     Camera m_camera;
@@ -41,4 +42,5 @@ private:
     bool initializeSkybox();
     bool initializeChessboard();
     bool initializePieces();
+
 };
