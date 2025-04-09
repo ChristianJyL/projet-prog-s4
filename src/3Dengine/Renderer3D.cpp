@@ -6,9 +6,10 @@
 #include "../Chess/Board.hpp"
 
 Renderer3D::Renderer3D() 
-    : m_skybox(nullptr), m_chessboard(nullptr), m_pieceRenderer(nullptr), m_isInitialized(false),
+    : m_isInitialized(false),
       m_selectedPiecePosition(0.0f), m_hasPieceSelected(false), m_selectedPieceColor(PieceColor::White),
-      m_selectedPieceX(0), m_selectedPieceY(0)
+      m_selectedPieceX(0), m_selectedPieceY(0),
+      m_chessboard(8) // Initialiser l'échiquier avec une taille de 8x8
 {
     std::cout << "Renderer3D constructor called" << std::endl;
 }
@@ -30,7 +31,6 @@ bool Renderer3D::initialize() {
             cleanup();
             return false;
         }
-        
         // Initialiser la caméra
         m_camera.setInitialPosition();
 
@@ -45,9 +45,8 @@ bool Renderer3D::initialize() {
 }
 
 bool Renderer3D::initializeSkybox() {
-    // Créer et initialiser la skybox
-    m_skybox = new SkyBox();
-    if (!m_skybox->initialize()) {
+    // Initialiser la skybox
+    if (!m_skybox.initialize()) {
         std::cerr << "ERROR::RENDERER3D::SKYBOX_INITIALIZATION_FAILED" << std::endl;
         return false;
     }
@@ -56,9 +55,8 @@ bool Renderer3D::initializeSkybox() {
 }
 
 bool Renderer3D::initializeChessboard() {
-    // Créer et initialiser l'échiquier 3D
-    m_chessboard = new Chessboard(8); // Échiquier 8x8 standard
-    if (!m_chessboard->initialize()) {
+    // Initialiser l'échiquier 3D (déjà créé dans le constructeur)
+    if (!m_chessboard.initialize()) {
         std::cerr << "ERROR::RENDERER3D::CHESSBOARD_INITIALIZATION_FAILED" << std::endl;
         return false;
     }
@@ -67,9 +65,8 @@ bool Renderer3D::initializeChessboard() {
 }
 
 bool Renderer3D::initializePieces() {
-    // Créer et initialiser le gestionnaire de pièces
-    m_pieceRenderer = new PieceRenderer();
-    if (!m_pieceRenderer->initialize()) {
+    // Initialiser le gestionnaire de pièces
+    if (!m_pieceRenderer.initialize()) {
         std::cerr << "ERROR::RENDERER3D::PIECE_RENDERER_INITIALIZATION_FAILED" << std::endl;
         return false;
     }
@@ -109,7 +106,7 @@ bool Renderer3D::initializePieces() {
             continue;
         }
         
-        if (m_pieceRenderer->loadPieceModel(pieceInfo.type, pieceInfo.path)) {
+        if (m_pieceRenderer.loadPieceModel(pieceInfo.type, pieceInfo.path)) {
             anyLoaded = true;
             std::cout << "Successfully loaded model for " << static_cast<int>(pieceInfo.type) << std::endl;
         } else {
@@ -122,55 +119,55 @@ bool Renderer3D::initializePieces() {
         // Continuer même si le chargement échoue
     } else {
         // Effacer les pièces existantes
-        m_pieceRenderer->clearPieces();
+        m_pieceRenderer.clearPieces();
         
         // Placer les pièces blanches
         // Pions (rang 1)
         for (int i = 0; i < 8; i++) {
-            m_pieceRenderer->addPiece(PieceType::Pawn, PieceColor::White, i, 1);
+            m_pieceRenderer.addPiece(PieceType::Pawn, PieceColor::White, i, 1);
         }
         
         // Tours (coins)
-        m_pieceRenderer->addPiece(PieceType::Rook, PieceColor::White, 0, 0);
-        m_pieceRenderer->addPiece(PieceType::Rook, PieceColor::White, 7, 0);
+        m_pieceRenderer.addPiece(PieceType::Rook, PieceColor::White, 0, 0);
+        m_pieceRenderer.addPiece(PieceType::Rook, PieceColor::White, 7, 0);
         
         // Cavaliers (à côté des tours)
-        m_pieceRenderer->addPiece(PieceType::Knight, PieceColor::White, 1, 0);
-        m_pieceRenderer->addPiece(PieceType::Knight, PieceColor::White, 6, 0);
+        m_pieceRenderer.addPiece(PieceType::Knight, PieceColor::White, 1, 0);
+        m_pieceRenderer.addPiece(PieceType::Knight, PieceColor::White, 6, 0);
         
         // Fous (à côté des cavaliers)
-        m_pieceRenderer->addPiece(PieceType::Bishop, PieceColor::White, 2, 0);
-        m_pieceRenderer->addPiece(PieceType::Bishop, PieceColor::White, 5, 0);
+        m_pieceRenderer.addPiece(PieceType::Bishop, PieceColor::White, 2, 0);
+        m_pieceRenderer.addPiece(PieceType::Bishop, PieceColor::White, 5, 0);
         
         // Reine (à gauche du roi)
-        m_pieceRenderer->addPiece(PieceType::Queen, PieceColor::White, 3, 0);
+        m_pieceRenderer.addPiece(PieceType::Queen, PieceColor::White, 3, 0);
         
         // Roi (au centre)
-        m_pieceRenderer->addPiece(PieceType::King, PieceColor::White, 4, 0);
+        m_pieceRenderer.addPiece(PieceType::King, PieceColor::White, 4, 0);
         
         // Placer les pièces noires
         // Pions (rang 6)
         for (int i = 0; i < 8; i++) {
-            m_pieceRenderer->addPiece(PieceType::Pawn, PieceColor::Black, i, 6);
+            m_pieceRenderer.addPiece(PieceType::Pawn, PieceColor::Black, i, 6);
         }
         
         // Tours (coins)
-        m_pieceRenderer->addPiece(PieceType::Rook, PieceColor::Black, 0, 7);
-        m_pieceRenderer->addPiece(PieceType::Rook, PieceColor::Black, 7, 7);
+        m_pieceRenderer.addPiece(PieceType::Rook, PieceColor::Black, 0, 7);
+        m_pieceRenderer.addPiece(PieceType::Rook, PieceColor::Black, 7, 7);
         
         // Cavaliers (à côté des tours)
-        m_pieceRenderer->addPiece(PieceType::Knight, PieceColor::Black, 1, 7);
-        m_pieceRenderer->addPiece(PieceType::Knight, PieceColor::Black, 6, 7);
+        m_pieceRenderer.addPiece(PieceType::Knight, PieceColor::Black, 1, 7);
+        m_pieceRenderer.addPiece(PieceType::Knight, PieceColor::Black, 6, 7);
         
         // Fous (à côté des cavaliers)
-        m_pieceRenderer->addPiece(PieceType::Bishop, PieceColor::Black, 2, 7);
-        m_pieceRenderer->addPiece(PieceType::Bishop, PieceColor::Black, 5, 7);
+        m_pieceRenderer.addPiece(PieceType::Bishop, PieceColor::Black, 2, 7);
+        m_pieceRenderer.addPiece(PieceType::Bishop, PieceColor::Black, 5, 7);
         
         // Reine (à gauche du roi)
-        m_pieceRenderer->addPiece(PieceType::Queen, PieceColor::Black, 3, 7);
+        m_pieceRenderer.addPiece(PieceType::Queen, PieceColor::Black, 3, 7);
         
         // Roi (au centre)
-        m_pieceRenderer->addPiece(PieceType::King, PieceColor::Black, 4, 7);
+        m_pieceRenderer.addPiece(PieceType::King, PieceColor::Black, 4, 7);
     }
     
     std::cout << "Piece renderer created successfully." << std::endl;
@@ -185,9 +182,7 @@ void Renderer3D::update(float deltaTime) {
     m_camera.update(deltaTime);
     
     // Mettre à jour les animations des pièces
-    if (m_pieceRenderer) {
-        m_pieceRenderer->update(deltaTime);
-    }
+    m_pieceRenderer.update(deltaTime);
     
     // Si une pièce est sélectionnée en mode vue pièce, mettre à jour sa position
     if (m_hasPieceSelected && m_camera.getCameraMode() == CameraMode::Piece) {
@@ -196,20 +191,8 @@ void Renderer3D::update(float deltaTime) {
 }
 
 void Renderer3D::cleanup() {
-    if (m_skybox) {
-        delete m_skybox;
-        m_skybox = nullptr;
-    }
-    
-    if (m_chessboard) {
-        delete m_chessboard;
-        m_chessboard = nullptr;
-    }
-    
-    if (m_pieceRenderer) {
-        delete m_pieceRenderer;
-        m_pieceRenderer = nullptr;
-    }
+    // Pas besoin de supprimer des objets, ils seront détruits automatiquement
+    // quand l'instance de Renderer3D sera détruite
     
     m_isInitialized = false;
 }
@@ -238,25 +221,13 @@ void Renderer3D::render() {
     }
     
     // Rendre l'échiquier 3D
-    if (m_chessboard) {
-        m_chessboard->render(viewMatrix, projectionMatrix);
-    } else {
-        std::cerr << "WARNING: Chessboard is null in render() method" << std::endl;
-    }
+    m_chessboard.render(viewMatrix, projectionMatrix);
     
     // Rendre les pièces d'échecs
-    if (m_pieceRenderer && m_chessboard) {
-        m_pieceRenderer->render(viewMatrix, projectionMatrix, m_chessboard->getSquareSize());
-    } else {
-        std::cerr << "WARNING: PieceRenderer or Chessboard is null in render() method" << std::endl;
-    }
+    m_pieceRenderer.render(viewMatrix, projectionMatrix, m_chessboard.getSquareSize());
     
     // Rendre la skybox en dernier (enveloppe tout)
-    if (m_skybox) {
-        m_skybox->Draw(viewMatrix, projectionMatrix);
-    } else {
-        std::cerr << "WARNING: Skybox is null in render() method" << std::endl;
-    }
+    m_skybox.Draw(viewMatrix, projectionMatrix);
     
     // Vérifier les erreurs OpenGL après le rendu complet
     while ((err = glGetError()) != GL_NO_ERROR) {
@@ -265,29 +236,20 @@ void Renderer3D::render() {
 }
 
 void Renderer3D::updatePiecesFromBoard(const Board& board) {
-    if (!m_isInitialized || !m_pieceRenderer) {
-        std::cerr << "ERREUR: Renderer3D non initialisé ou PieceRenderer non disponible" << std::endl;
+    if (!m_isInitialized) {
         return;
     }
     
-    std::cout << "Mise à jour des pièces 3D depuis l'état du plateau 2D" << std::endl;
-    
-    // Récupérer l'état complet de l'échiquier
+    // Récupérer l'état actuel de l'échiquier
     const std::vector<Piece>& boardState = board.getBoardState();
-    
-    // Créer le nouvel état pour l'animation
     std::vector<ChessPiece> newState;
     
-    // Parcourir toutes les positions de l'échiquier
+    // Convertir l'état 2D en représentation 3D
     for (int y = 0; y < 8; y++) {
         for (int x = 0; x < 8; x++) {
-            // Index dans le vecteur linéaire des pièces
             int index = x + y * 8;
-            
-            // Récupérer la pièce à cette position
             Piece piece = boardState[index];
             
-            // Si la case n'est pas vide, ajouter la pièce au nouvel état
             if (piece.type != PieceType::None) {
                 ChessPiece chessPiece;
                 chessPiece.type = piece.type;
@@ -301,19 +263,12 @@ void Renderer3D::updatePiecesFromBoard(const Board& board) {
     }
     
     // Animer la transition vers le nouvel état
-    if (m_pieceRenderer) {
-        m_pieceRenderer->animateTransition(newState, 1.0f);
-    }
-
+    m_pieceRenderer.animateTransition(newState, 1.0f);
 }
 
 glm::vec3 Renderer3D::getChessBoardPosition(int x, int y) const {
-    if (!m_chessboard) {
-        return glm::vec3(0.0f); // Position par défaut si l'échiquier n'est pas initialisé
-    }
-    
-    float squareSize = m_chessboard->getSquareSize();
-    float squareHeight = m_chessboard->getSquareHeight(); // Récupérer la hauteur des cases
+    float squareSize = m_chessboard.getSquareSize();
+    float squareHeight = m_chessboard.getSquareHeight(); // Récupérer la hauteur des cases
     
     // Convertir les coordonnées de l'échiquier en coordonnées 3D
     // L'origine est dans le coin inférieur gauche
@@ -325,72 +280,60 @@ glm::vec3 Renderer3D::getChessBoardPosition(int x, int y) const {
 }
 
 bool Renderer3D::selectPieceForView(int x, int y) {
-    if (!m_isInitialized || !m_pieceRenderer) {
-        std::cerr << "ERREUR: Renderer3D non initialisé ou PieceRenderer non disponible" << std::endl;
+    if (!m_isInitialized) {
         return false;
     }
     
-    // Vérifier si la position est valide (dans l'échiquier) (normalement c'est pas sensé arriver)
+    // Vérification des limites de l'échiquier
     if (x < 0 || x >= 8 || y < 0 || y >= 8) {
-        std::cout << "Position invalide pour la sélection de pièce: (" << x << ", " << y << ")" << std::endl;
         return false;
     }
     
-    // Obtenir la position 3D de la case
     glm::vec3 squarePosition = getChessBoardPosition(x, y);
-    
-    // Vérifier s'il y a une pièce à cette position
     bool pieceFound = false;
     PieceColor pieceColor = PieceColor::White;
     
-    // Vérifier si la liste des pièces est vide
-    auto pieces = m_pieceRenderer->getPieces();
+    // Recherche de la pièce aux coordonnées spécifiées
+    auto pieces = m_pieceRenderer.getPieces();
     if (pieces.empty()) {
-        std::cout << "Aucune pièce disponible - la liste est vide" << std::endl;
         return false;
     }
     
-    // Parcourir toutes les pièces pour trouver celle à cette position
     for (const auto& piece : pieces) {
         if (piece.x == x && piece.y == y) {
             pieceFound = true;
             pieceColor = piece.color;
-            std::cout << "Pièce trouvée à la position (" << x << ", " << y << "), couleur: " 
-                      << (pieceColor == PieceColor::White ? "Blanche" : "Noire") << std::endl;
             break;
         }
     }
     
     if (!pieceFound) {
-        std::cout << "Aucune pièce trouvée à la position (" << x << ", " << y << ")" << std::endl;
         return false;
     }
     
-    // Stocker la position et la couleur de la pièce sélectionnée
+    // Mémoriser les informations de la pièce sélectionnée
     m_selectedPiecePosition = squarePosition;
     m_selectedPieceColor = pieceColor;
     m_hasPieceSelected = true;
     m_selectedPieceX = x;
     m_selectedPieceY = y;
     
-    // Mettre à jour la caméra en mode pièce en tenant compte de la couleur
+    // Positionner la caméra sur la pièce
     m_camera.setPieceView(m_selectedPiecePosition, m_selectedPieceColor);
-    
-    std::cout << "Pièce sélectionnée avec succès à la position (" << x << ", " << y << ")" << std::endl;
     return true;
 }
 
 void Renderer3D::updateTrackedPiece() {
-    if (!m_hasPieceSelected || !m_pieceRenderer || !m_chessboard) {
+    if (!m_hasPieceSelected) {
         return;
     }
     
-    float squareSize = m_chessboard->getSquareSize();
+    float squareSize = m_chessboard.getSquareSize();
     
     // Vérifier si la pièce est en cours d'animation
-    if (m_pieceRenderer->isPieceAnimating(m_selectedPieceX, m_selectedPieceY)) {
+    if (m_pieceRenderer.isPieceAnimating(m_selectedPieceX, m_selectedPieceY)) {
         // Obtenir la position actuelle de la pièce pendant l'animation
-        glm::vec3 currentPos = m_pieceRenderer->getPiecePosition(m_selectedPieceX, m_selectedPieceY, squareSize);
+        glm::vec3 currentPos = m_pieceRenderer.getPiecePosition(m_selectedPieceX, m_selectedPieceY, squareSize);
         
         // Mettre à jour la position de la caméra pour suivre la pièce
         m_camera.setPieceView(currentPos, m_selectedPieceColor);
@@ -400,7 +343,7 @@ void Renderer3D::updateTrackedPiece() {
         int newX = m_selectedPieceX;
         int newY = m_selectedPieceY;
         
-        if (m_pieceRenderer->findNewPiecePosition(m_selectedPieceX, m_selectedPieceY, newX, newY)) {
+        if (m_pieceRenderer.findNewPiecePosition(m_selectedPieceX, m_selectedPieceY, newX, newY)) {
             // La pièce a changé de position
             m_selectedPieceX = newX;
             m_selectedPieceY = newY;

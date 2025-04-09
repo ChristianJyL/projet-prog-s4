@@ -39,9 +39,9 @@ private:
     // Caméra standard
     Camera m_camera;
     
-    SkyBox* m_skybox;
-    Chessboard* m_chessboard;
-    PieceRenderer* m_pieceRenderer;
+    SkyBox m_skybox;
+    Chessboard m_chessboard;
+    PieceRenderer m_pieceRenderer;
     bool m_isInitialized;
     
     // Position de la pièce sélectionnée pour la vue

@@ -7,25 +7,15 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glad/glad.h>
 
-void app::init()
-{
-    // Initialiser le Renderer3D avant le plateau pour qu'il soit prêt
+void app::init() {
+    // Initialiser dans l'ordre correct
     m_renderer3D.initialize(); 
-    
-    // Connecter le renderer3D au plateau
     m_board.setRenderer3D(&m_renderer3D);
-    
-    // Initialiser le plateau après avoir configuré le renderer
     m_board.initializeBoard(); 
-    
-    // Forcer une mise à jour initiale
     m_board.updateRenderer3D();
-    
-    std::cout << "3D Renderer connecté au plateau d'échecs" << std::endl;
 }
 
-void app::update()
-{
+void app::update() {
     static float lastFrameTime = (float)glfwGetTime();
     float currentTime = (float)glfwGetTime();
     float deltaTime = currentTime - lastFrameTime;
@@ -40,7 +30,7 @@ void app::update()
                                 "Mode Trackball" : "Mode Vue Pièce";
         ImGui::Text("Mode actuel: %s", cameraMode);
         
-        // Message d'état pour la sélection de pièce
+        // Instructions adaptées au mode
         if (m_renderer3D.getCamera().getCameraMode() == CameraMode::Trackball) {
             ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), //TODO : à changer avec une variable de couleur
                 "Clic droit pour vous déplacer autour de l'échiquier");
@@ -49,15 +39,10 @@ void app::update()
                 "Vue depuis la pièce - utilisez le clic droit pour regarder autour");
         }
         
-        // Afficher les boutons de sélection rapide des pièces directement dans le panneau principal
+        // Sélection rapide des pièces
         if (ImGui::CollapsingHeader("Sélectionner une pièce pour la vue", ImGuiTreeNodeFlags_DefaultOpen)) {
-            // Créer une grille de boutons pour les pièces principales
             if (ImGui::Button("Roi blanc", ImVec2(100, 30))) {
-                if (m_renderer3D.selectPieceForView(4, 0)) {
-                    std::cout << "Pièce sélectionnée: Roi blanc" << std::endl;
-                } else {
-                    std::cout << "Échec de sélection du Roi blanc" << std::endl;
-                }
+                m_renderer3D.selectPieceForView(4, 0);
             }
             ImGui::SameLine();
             if (ImGui::Button("Dame blanche", ImVec2(100, 30))) {
@@ -73,13 +58,12 @@ void app::update()
             }
         }
         
-        // Bouton pour basculer entre les modes
-        if (ImGui::Button("Changer de mode de caméra", ImVec2(200, 30))) {
+        // Bouton pour changer de mode caméra
+        if (ImGui::Button("Changer de mode caméra", ImVec2(200, 30))) {
             m_renderer3D.toggleCameraMode();
-            //std::cout << "Changement de caméra effectué" << std::endl;
         }
         
-        // Instructions de contrôle
+        // Aide des contrôles
         ImGui::Separator();
         ImGui::Text("Contrôles: Clic droit + déplacer pour tourner la caméra");
         ImGui::Text("Molette de souris pour zoomer (mode Trackball uniquement)");
@@ -87,32 +71,23 @@ void app::update()
     }
     ImGui::End();
     
-    // Créer une section pour le rendu 3D
+    // Fenêtre du rendu 3D
     ImGui::Begin("3D Chess Viewport", nullptr, ImGuiWindowFlags_NoScrollbar);
-    
     ImVec2 viewportSize = ImGui::GetContentRegionAvail();
     
-    // Vérifier si la taille de la fenêtre est valide
     if (viewportSize.x > 0 && viewportSize.y > 0) {
-        // Mettre à jour le ratio d'aspect de la caméra - accès direct à la caméra
         m_renderer3D.getCamera().setAspectRatio(viewportSize.x / std::max(viewportSize.y, 1.0f));
         
-        // Obtenir la position de la fenêtre ImGui dans l'écran
-        ImVec2 windowPos = ImGui::GetWindowPos();
-        ImVec2 contentPos = ImGui::GetCursorScreenPos();
-        
-        // Obtenir les matrices de vue et de projection directement de la caméra
         glm::mat4 view = m_renderer3D.getCamera().getViewMatrix();
         glm::mat4 projection = m_renderer3D.getCamera().getProjectionMatrix();
 
-        // Créer un framebuffer de rendu si nécessaire
         static GLuint fbo = 0, renderTexture = 0, depthBuffer = 0;
         if (fbo == 0) {
-            // Créer un framebuffer pour le rendu
+            // Création initiale des ressources de rendu
             glGenFramebuffers(1, &fbo);
             glBindFramebuffer(GL_FRAMEBUFFER, fbo);
             
-            // Créer une texture pour y rendre
+            // Texture pour le résultat coloré
             glGenTextures(1, &renderTexture);
             glBindTexture(GL_TEXTURE_2D, renderTexture);
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, (int)viewportSize.x, (int)viewportSize.y, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
@@ -120,76 +95,54 @@ void app::update()
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
             glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, renderTexture, 0);
             
-            // Créer un renderbuffer pour la profondeur
+            // Buffer de profondeur
             glGenRenderbuffers(1, &depthBuffer);
             glBindRenderbuffer(GL_RENDERBUFFER, depthBuffer);
             glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, (int)viewportSize.x, (int)viewportSize.y);
             glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depthBuffer);
             
-            // Vérifier que le framebuffer est complet
-            if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-                std::cerr << "ERROR: Framebuffer n'est pas complet! Statut: " 
-                          << std::hex << glCheckFramebufferStatus(GL_FRAMEBUFFER) << std::dec << std::endl;
-            }
-            
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
         }
         
-        // Redimensionner le framebuffer si la taille de la fenêtre a changé
+        // Gestion du redimensionnement
         static ImVec2 lastSize = viewportSize;
         if (lastSize.x != viewportSize.x || lastSize.y != viewportSize.y) {
-            // Mettre à jour la texture
             glBindTexture(GL_TEXTURE_2D, renderTexture);
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, (int)viewportSize.x, (int)viewportSize.y, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
             
-            // Mettre à jour le renderbuffer de profondeur
             glBindRenderbuffer(GL_RENDERBUFFER, depthBuffer);
             glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, (int)viewportSize.x, (int)viewportSize.y);
-            
-            // Vérifier que le framebuffer est toujours complet après le redimensionnement
-            glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-            glBindFramebuffer(GL_FRAMEBUFFER, 0);
             
             lastSize = viewportSize;
         }
         
-        // Rendre dans le framebuffer
+        // Rendu de la scène dans le framebuffer
         glBindFramebuffer(GL_FRAMEBUFFER, fbo);
         glViewport(0, 0, (int)viewportSize.x, (int)viewportSize.y);
         
-           
-   
-        // Dessiner la scène 3D dans le framebuffer
         if (m_renderer3D.isInitialized()) {
             try {
-                // Dessiner la scène 3D complète
                 m_renderer3D.render();
             } catch (const std::exception& e) {
-                std::cerr << "Erreur lors du dessin de la scène 3D: " << e.what() << std::endl;
+                std::cerr << "Erreur lors du rendu: " << e.what() << std::endl;
             }
         }
         
-        // Retourner au framebuffer par défaut
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         
-        // Afficher la texture rendue dans ImGui
+        // Affichage du résultat dans ImGui
         ImGui::Image((void*)(intptr_t)renderTexture, viewportSize, ImVec2(0, 1), ImVec2(1, 0));
         
-        // Gérer les interactions avec la souris pour la caméra
-        // Capture les événements de souris uniquement quand ImGui n'interagit pas avec eux
+        // Gestion des contrôles de la caméra
         if (ImGui::IsItemHovered() && !ImGui::IsAnyItemActive()) {
             if (ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
-                // Récupérer le mouvement de la souris
+                // Rotation de la caméra avec la souris
                 ImVec2 mouseDelta = ImGui::GetIO().MouseDelta;
-                
-                // Rotation de la caméra - accès direct
-                // Inversion de la rotation horizontale pour un mouvement plus naturel
                 m_renderer3D.getCamera().rotateLeft(-mouseDelta.x * 0.01f);
-                // Inverser également la rotation verticale pour un comportement plus intuitif
                 m_renderer3D.getCamera().rotateUp(mouseDelta.y * 0.01f);
             }
             
-            // Zoom avec la molette de la souris - accès direct (uniquement en mode trackball)
+            // Zoom avec la molette (uniquement en mode trackball)
             if (m_renderer3D.getCamera().getCameraMode() == CameraMode::Trackball) {
                 float wheel = ImGui::GetIO().MouseWheel;
                 if (wheel != 0) {
@@ -201,54 +154,45 @@ void app::update()
     
     ImGui::End();
     
-    // Afficher l'échiquier
+    // Affichage de l'échiquier 2D
     m_board.drawBoard();
     
-    // Variable statique pour suivre l'état de la popup
+    // Gestion de la fin de partie
     static bool gameOverPopupClosed = false;
     
-    // Afficher un message si la partie est terminée et que la popup n'a pas déjà été fermée manuellement
-    if (m_board.isGameOver() && !gameOverPopupClosed)
-    {
+    if (m_board.isGameOver() && !gameOverPopupClosed) {
         ImGui::OpenPopup("Game Over");
     }
 
-    // Popup modal
-    if (ImGui::BeginPopupModal("Game Over", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
-    {
+    if (ImGui::BeginPopupModal("Game Over", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         PieceColor winner = m_board.getWinner();
         const char* winnerText = (winner == PieceColor::White) ? "White" : "Black";
         ImGui::Text("%s wins! The king has been captured.", winnerText);
 
-        if (ImGui::Button("New Game", ImVec2(120, 0)))
-        {
-            // Créer un nouveau plateau et le configurer correctement
+        // Options de fin de partie
+        if (ImGui::Button("New Game", ImVec2(120, 0))) {
+            // Réinitialisation complète du jeu
             m_board = Board();
             m_board.setRenderer3D(&m_renderer3D);
             m_board.initializeBoard();
             m_board.updateRenderer3D();
             
-            // Réinitialiser l'état de la popup
             gameOverPopupClosed = false;
-            
             ImGui::CloseCurrentPopup();
-            std::cout << "Starting new game" << std::endl;
         }
 
         ImGui::SameLine();
 
-        if (ImGui::Button("Close", ImVec2(120, 0)))
-        {
-            // Marquer la popup comme fermée manuellement
+        if (ImGui::Button("Close", ImVec2(120, 0))) {
             gameOverPopupClosed = true;
             ImGui::CloseCurrentPopup();
         }
 
         ImGui::EndPopup();
     }
-    // raccourcis cam
+    
+    // Raccourci pour changer de mode caméra
     if (ImGui::IsKeyPressed(ImGuiKey_C)) {
-        //std::cout << "Touche C pressée - basculement de mode caméra" << std::endl;
         m_renderer3D.toggleCameraMode();
     }
 }

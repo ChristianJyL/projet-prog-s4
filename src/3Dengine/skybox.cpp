@@ -48,7 +48,7 @@ SkyBox::SkyBox(const std::vector<std::string>& faces)
 
             // Face droite (+X)
             1.0f, -1.0f, -1.0f,
-            1.0f, -1.0f,  1.0f,
+            1.0f,  1.0f,  1.0f,
             1.0f,  1.0f,  1.0f,
             1.0f,  1.0f,  1.0f,
             1.0f,  1.0f, -1.0f,
@@ -142,7 +142,7 @@ bool SkyBox::initialize() {
 
         // Face droite (+X)
         1.0f, -1.0f, -1.0f,
-        1.0f, -1.0f,  1.0f,
+        1.0f,  -1.0f,  1.0f,
         1.0f,  1.0f,  1.0f,
         1.0f,  1.0f,  1.0f,
         1.0f,  1.0f, -1.0f,
@@ -308,55 +308,40 @@ bool SkyBox::compileShader() {
 
 void SkyBox::Draw(const glm::mat4& view, const glm::mat4& projection) {
     if (!m_isInitialized) {
-        std::cerr << "ERROR::SKYBOX::DRAW::NOT_INITIALIZED" << std::endl;
         return;
     }
 
-    // Sauvegarder l'état OpenGL actuel
-    GLint previousVAO;
+    // Sauvegarder l'état OpenGL actuel pour le restaurer ensuite
+    GLint previousVAO, previousShader, previousDepthFunc;
     glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &previousVAO);
-    
-    GLint previousShader;
     glGetIntegerv(GL_CURRENT_PROGRAM, &previousShader);
-    
-    // Activation du depth test
-    glEnable(GL_DEPTH_TEST);
-    
-    // Sauvegarder la fonction de profondeur et la changer
-    GLint previousDepthFunc;
     glGetIntegerv(GL_DEPTH_FUNC, &previousDepthFunc);
-    glDepthFunc(GL_LEQUAL);
-
-    // Supprimer la translation de la matrice de vue
-    glm::mat4 viewNoTranslation = glm::mat4(glm::mat3(view));
     
-    // Utiliser le shader du skybox
+    // Configuration pour le rendu de la skybox
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LEQUAL); // Permet d'afficher la skybox derrière tout le reste
+
+    // Supprimer la composante de translation de la matrice de vue
+    glm::mat4 viewNoTranslation = glm::mat4(glm::mat3(view));
     m_skyboxShader.use();
     
-    // Vérifier les locations des uniformes
+    // Configuration des uniformes du shader
     GLint viewLoc = glGetUniformLocation(m_skyboxShader.getGLId(), "view");
     GLint projLoc = glGetUniformLocation(m_skyboxShader.getGLId(), "projection");
     GLint skyboxLoc = glGetUniformLocation(m_skyboxShader.getGLId(), "skybox");
     
-    if (viewLoc == -1 || projLoc == -1 || skyboxLoc == -1) {
-        std::cerr << "ERROR::SKYBOX::UNIFORM_LOCATIONS: view=" << viewLoc 
-                  << ", projection=" << projLoc 
-                  << ", skybox=" << skyboxLoc << std::endl;
-    }
-    
     glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(viewNoTranslation));
     glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
     
-    // Activer la texture du skybox
+    // Rendu de la skybox
     glBindVertexArray(VAO);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_CUBE_MAP, textureID);
     glUniform1i(skyboxLoc, 0);
     
-    // Dessiner le skybox
     glDrawArrays(GL_TRIANGLES, 0, 36);
     
-    // Restaurer l'état OpenGL
+    // Restauration de l'état OpenGL précédent
     glBindVertexArray(previousVAO);
     glUseProgram(previousShader);
     glDepthFunc(previousDepthFunc);

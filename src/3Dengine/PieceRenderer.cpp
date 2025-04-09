@@ -8,7 +8,6 @@
 PieceRenderer::PieceRenderer()
     : m_piecesLoaded(false)
 {
-    std::cout << "PieceRenderer constructor called" << std::endl;
 }
 
 PieceRenderer::~PieceRenderer() {
@@ -369,23 +368,18 @@ void PieceRenderer::startPieceMovement(ChessPiece& piece, int targetX, int targe
 }
 
 void PieceRenderer::animateTransition(const std::vector<ChessPiece>& newState, float duration) {
+    // Si pas de pièces actuelles, adopter directement le nouvel état
     if (m_pieces.empty()) {
-        // Si aucune pièce actuelle, juste adopter le nouvel état
         m_pieces = newState;
         return;
     }
     
-    // Vérifier s'il y a des changements entre l'état actuel et le nouvel état
     bool hasChanges = false;
-    
-    // Créer une copie du nouvel état pour le traitement
     std::vector<ChessPiece> mutableNewState = newState;
-    
-    // Marquer les pièces qui sont présentes dans l'ancien état et le nouveau (non déplacées)
     std::vector<bool> oldPieceMatched(m_pieces.size(), false);
     std::vector<bool> newPieceMatched(mutableNewState.size(), false);
     
-    //identification des pièces qui n'ont pas bougé (même position dans les deux états + couleur et type au cas ou)
+    // Identifier d'abord les pièces qui n'ont pas bougé
     for (size_t i = 0; i < m_pieces.size(); ++i) {
         for (size_t j = 0; j < mutableNewState.size(); ++j) {
             if (!newPieceMatched[j] && 
@@ -394,7 +388,6 @@ void PieceRenderer::animateTransition(const std::vector<ChessPiece>& newState, f
                 m_pieces[i].x == mutableNewState[j].x && 
                 m_pieces[i].y == mutableNewState[j].y) {
                 
-                // Cette pièce n'a pas bougé
                 oldPieceMatched[i] = true;
                 newPieceMatched[j] = true;
                 break;
@@ -402,16 +395,16 @@ void PieceRenderer::animateTransition(const std::vector<ChessPiece>& newState, f
         }
     }
     
-    // Appliquer directement les mouvements pour chaque pièce non matchée
+    // Déplacer les pièces qui ont changé de position
     for (size_t i = 0; i < m_pieces.size(); ++i) {
-        if (oldPieceMatched[i]) continue;  // Déjà fait
+        if (oldPieceMatched[i]) continue;
         
         for (size_t j = 0; j < mutableNewState.size(); ++j) {
-            if (newPieceMatched[j]) continue;  // Déjà fait
+            if (newPieceMatched[j]) continue;
             
+            // Même type et couleur mais position différente = mouvement
             if (m_pieces[i].type == mutableNewState[j].type && 
                 m_pieces[i].color == mutableNewState[j].color) {
-                // Cette pièce s'est déplacée
                 ChessPiece& piece = m_pieces[i];
                 const ChessPiece& target = mutableNewState[j];
                 
@@ -420,39 +413,38 @@ void PieceRenderer::animateTransition(const std::vector<ChessPiece>& newState, f
                 
                 oldPieceMatched[i] = true;
                 newPieceMatched[j] = true;
-                break;  // Une seule destination possible par pièce
+                break;
             }
         }
     }
 
-    // 3. Les pièces de l'ancien état qui n'ont pas été matchées ont été capturées
+    // Les pièces non matchées dans l'ancien état ont été capturées
     for (size_t i = 0; i < m_pieces.size(); ++i) {
         if (!oldPieceMatched[i]) {
-            // Cette pièce a été capturée
+            // Animer la capture de la pièce
             m_pieces[i].state = AnimationState::Capturing;
             m_pieces[i].isBeingCaptured = true;
             m_pieces[i].animationTime = 0.0f;
-            m_pieces[i].animationDuration = duration * 0.8f;
+            m_pieces[i].animationDuration = duration * 0.8f; // Un peu plus rapide
             m_pieces[i].startPosition = calculateChessPosition(m_pieces[i].x, m_pieces[i].y, 1.0f);
             hasChanges = true;
         }
     }
 
-    // 4. Les pièces du nouvel état qui n'ont pas été matchées sont nouvelles (ex: promotion de pion)
+    // Les pièces non matchées dans le nouvel état sont nouvelles (promotion)
     for (size_t j = 0; j < mutableNewState.size(); ++j) {
         if (!newPieceMatched[j]) {
-            // C'est une nouvelle pièce, l'ajouter directement
             addPiece(mutableNewState[j].type, mutableNewState[j].color, 
                     mutableNewState[j].x, mutableNewState[j].y);
             hasChanges = true;
         }
     }
 
-    // Sauvegarder le nouvel état pour l'appliquer une fois l'animation terminée
+    // Stocker le prochain état si des changements ont été détectés
     if (hasChanges) {
         m_nextState = mutableNewState;
     } else {
-        // S'il n'y a aucun changement, appliquer directement le nouvel état
+        // Sinon appliquer directement le nouvel état
         m_pieces = mutableNewState;
     }
 }

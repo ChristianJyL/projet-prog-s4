@@ -1,9 +1,19 @@
 #include "Program.hpp"
 #include <stdexcept>
+#include <fstream>
+#include <sstream>
+#include <iostream>
+#include <glad/glad.h>
 
 namespace glBurnout {
 
 bool Program::link() {
+	if (m_nGLId == 0) {
+		if (!initialize()) {
+			return false;
+		}
+	}
+	
 	glLinkProgram(m_nGLId);
 	GLint status;
 	glGetProgramiv(m_nGLId, GL_LINK_STATUS, &status);
@@ -22,53 +32,55 @@ const std::string Program::getInfoLog() const {
 
 // Build a GLSL program from source code
 Program buildProgram(const GLchar* vsSrc, const GLchar* fsSrc) {
+	Program program;
+	program.initialize();  
+	
 	Shader vs(GL_VERTEX_SHADER);
 	vs.setSource(vsSrc);
-
+	
 	if(!vs.compile()) {
-		throw std::runtime_error("Compilation error for vertex shader: " + vs.getInfoLog());
+		std::cerr << "Vertex shader compilation error: " << vs.getInfoLog() << std::endl;
+		throw std::runtime_error("Vertex shader compilation failed");
 	}
-
+	program.attachShader(vs);
+	
 	Shader fs(GL_FRAGMENT_SHADER);
 	fs.setSource(fsSrc);
-
+	
 	if(!fs.compile()) {
-		throw std::runtime_error("Compilation error for fragment shader: " + fs.getInfoLog());
+		std::cerr << "Fragment shader compilation error: " << fs.getInfoLog() << std::endl;
+		throw std::runtime_error("Fragment shader compilation failed");
 	}
-
-	Program program;
-	program.attachShader(vs);
 	program.attachShader(fs);
-
+	
 	if(!program.link()) {
-		throw std::runtime_error("Link error: " + program.getInfoLog());
+		std::cerr << "Program linking error: " << program.getInfoLog() << std::endl;
+		throw std::runtime_error("Program linking failed");
 	}
-
+	
+	glDetachShader(program.getGLId(), vs.getGLId());
+	glDetachShader(program.getGLId(), fs.getGLId());
+	
 	return program;
 }
 
 // Load source code from files and build a GLSL program
 Program loadProgram(const FilePath& vsFile, const FilePath& fsFile) {
-	Shader vs = loadShader(GL_VERTEX_SHADER, vsFile);
-	Shader fs = loadShader(GL_FRAGMENT_SHADER, fsFile);
-
-	if(!vs.compile()) {
-		throw std::runtime_error("Compilation error for vertex shader (from file " + std::string(vsFile) + "): " + vs.getInfoLog());
+	std::ifstream vsStream(vsFile);
+	if(!vsStream) {
+		throw std::runtime_error("Cannot open vertex shader file: " + vsFile.str());
 	}
-
-	if(!fs.compile()) {
-		throw std::runtime_error("Compilation error for fragment shader (from file " + std::string(fsFile) + "): " + fs.getInfoLog());
+	std::stringstream vsSrc;
+	vsSrc << vsStream.rdbuf();
+	
+	std::ifstream fsStream(fsFile);
+	if(!fsStream) {
+		throw std::runtime_error("Cannot open fragment shader file: " + fsFile.str());
 	}
-
-	Program program;
-	program.attachShader(vs);
-	program.attachShader(fs);
-
-	if(!program.link()) {
-        throw std::runtime_error("Link error (for files " + vsFile.str() + " and " + fsFile.str() + "): " + program.getInfoLog());
-	}
-
-	return program;
+	std::stringstream fsSrc;
+	fsSrc << fsStream.rdbuf();
+	
+	return buildProgram(vsSrc.str().c_str(), fsSrc.str().c_str());
 }
 
 }

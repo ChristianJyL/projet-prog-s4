@@ -9,11 +9,21 @@ namespace glBurnout {
 
 class Program {
 public:
-	Program(): m_nGLId(glCreateProgram()) {
+	Program(): m_nGLId(0) {
+	}
+	
+	bool initialize() {
+		if (m_nGLId == 0) {
+			m_nGLId = glCreateProgram();
+			return m_nGLId != 0;
+		}
+		return true;
 	}
 
 	~Program() {
-		glDeleteProgram(m_nGLId);
+		if (m_nGLId != 0) {
+			glDeleteProgram(m_nGLId);
+		}
 	}
 
 	Program(Program&& rvalue): m_nGLId(rvalue.m_nGLId) {
@@ -31,6 +41,9 @@ public:
 	}
 
 	void attachShader(const Shader& shader) {
+		if (m_nGLId == 0) {
+			initialize();
+		}
 		glAttachShader(m_nGLId, shader.getGLId());
 	}
 
@@ -39,7 +52,9 @@ public:
 	const std::string getInfoLog() const;
 
 	void use() const {
-		glUseProgram(m_nGLId);
+		if (m_nGLId != 0) {
+			glUseProgram(m_nGLId);
+		}
 	}
 
 private:
@@ -54,6 +69,5 @@ Program buildProgram(const GLchar* vsSrc, const GLchar* fsSrc);
 
 // Load source code from files and build a GLSL program
 Program loadProgram(const FilePath& vsFile, const FilePath& fsFile);
-
 
 }

@@ -10,7 +10,7 @@ constexpr ImVec4 COLOR_DARK_GREEN = ImVec4{0.0f, 0.39f, 0.0f, 1.0f}; // utiliser
 constexpr ImVec4 COLOR_BEIGE      = ImVec4{0.96f, 0.87f, 0.70f, 1.0f};
 
 void Board::updateRenderer3D() {
-    if (m_renderer3D != nullptr) {
+    if (m_renderer3D) {
         m_renderer3D->updatePiecesFromBoard(*this);
     }
 }
@@ -221,16 +221,11 @@ void Board::syncCameraWithSelection()
 {
     if (m_renderer3D && m_selectedPiece.has_value()) {
         Position pos = m_selectedPiece.value();
-        int x = pos.x;
-        int y = pos.y;
-        
         Camera& camera = m_renderer3D->getCamera();
         
         if (camera.getCameraMode() == CameraMode::Piece) {
-            // Seulement si nous sommes en mode vue pièce, sélectionner la pièce
-            m_renderer3D->selectPieceForView(x, y);
+            m_renderer3D->selectPieceForView(pos.x, pos.y);
         }
-        // En mode trackball, ne rien faire(garder la vue actuelle)
     }
 }
 
