@@ -92,7 +92,6 @@ void Chessboard::render(const glm::mat4& view, const glm::mat4& projection) {
     
     // Vérifier que nous avons bien des indices à dessiner
     if (m_indices.size() > 0) {
-        std::cout << "Drawing chessboard with " << m_indices.size() << " indices" << std::endl;
         glDrawElements(GL_TRIANGLES, m_indices.size(), GL_UNSIGNED_INT, 0);
     } else {
         std::cerr << "WARNING: No indices to draw in chessboard" << std::endl;

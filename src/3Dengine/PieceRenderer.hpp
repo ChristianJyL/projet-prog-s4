@@ -62,6 +62,16 @@ public:
     void animateTransition(const std::vector<ChessPiece>& newState, float duration = 1.0f);
     bool isAnimating() const;
     
+    // Accès aux pièces pour la sélection
+    const std::vector<ChessPiece>& getPieces() const { return m_pieces; }
+    
+    // Méthodes pour suivre une pièce spécifique
+    glm::vec3 getPiecePosition(int x, int y, float squareSize) const;
+    bool isPieceAnimating(int x, int y) const;
+    
+    // Trouver la nouvelle position d'une pièce après animation
+    bool findNewPiecePosition(int oldX, int oldY, int& newX, int& newY) const;
+    
 private:
     std::map<PieceType, PieceRenderData> m_pieceData;
     glBurnout::Program m_pieceShader;

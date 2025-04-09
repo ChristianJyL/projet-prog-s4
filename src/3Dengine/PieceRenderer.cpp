@@ -465,3 +465,89 @@ bool PieceRenderer::isAnimating() const {
     }
     return false;
 }
+
+glm::vec3 PieceRenderer::getPiecePosition(int x, int y, float squareSize) const {
+    // Chercher la pièce aux coordonnées données
+    for (const auto& piece : m_pieces) {
+        if (piece.x == x && piece.y == y) {
+            // Si la pièce est en animation, calculer sa position actuelle
+            if (piece.state != AnimationState::Idle) {
+                float t = piece.animationTime / piece.animationDuration;
+                float smoothT = t * t * (3.0f - 2.0f * t); // Courbe d'accélération/décélération
+                
+                if (piece.isBeingCaptured) {
+                    // Pièce en cours de capture - retourner la position de départ
+                    return piece.startPosition;
+                }
+                else {
+                    // Pièce en déplacement normal
+                    float jumpFactor = 4.0f * smoothT * (1.0f - smoothT);
+                    glm::vec3 currentPos = glm::mix(piece.startPosition, piece.targetPosition, smoothT);
+                    currentPos.y += piece.jumpHeight * jumpFactor;
+                    return currentPos;
+                }
+            }
+            else {
+                // Si la pièce est immobile, calculer sa position normale sur l'échiquier
+                return calculateChessPosition(piece.x, piece.y, squareSize);
+            }
+        }
+    }
+    
+    // Si la pièce n'est pas trouvée, vérifier l'état suivant (si en animation)
+    if (!m_nextState.empty()) {
+        for (const auto& piece : m_nextState) {
+            if (piece.x == x && piece.y == y) {
+                return calculateChessPosition(piece.x, piece.y, squareSize);
+            }
+        }
+    }
+    
+    // Si la pièce n'est pas trouvée, retourner une position par défaut
+    return calculateChessPosition(x, y, squareSize);
+}
+
+bool PieceRenderer::isPieceAnimating(int x, int y) const {
+    for (const auto& piece : m_pieces) {
+        if (piece.x == x && piece.y == y && piece.state != AnimationState::Idle) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool PieceRenderer::findNewPiecePosition(int oldX, int oldY, int& newX, int& newY) const {
+    // Cette méthode permet de trouver la nouvelle position d'une pièce après une animation
+    // Pour chaque pièce qui est d'une position différente de sa position initiale
+    for (const auto& piece : m_pieces) {
+        // Vérifier si cette pièce est en cours d'animation
+        if (piece.state != AnimationState::Idle && !piece.isBeingCaptured) {
+            // Calculer la position du début de l'animation
+            glm::vec3 startPos = piece.startPosition;
+            int startX = (int)roundf((startPos.x + 4.0f) - 0.5f);
+            int startY = (int)roundf((startPos.z + 4.0f) - 0.5f);
+            
+            // Si c'est notre pièce d'origine
+            if (startX == oldX && startY == oldY) {
+                // Retourner la nouvelle position
+                newX = piece.x;
+                newY = piece.y;
+                return true;
+            }
+        }
+    }
+    
+    // Vérifier dans l'état suivant
+    if (!m_nextState.empty()) {
+        for (const auto& piece : m_nextState) {
+            if (piece.x == oldX && piece.y == oldY) {
+                newX = piece.x;
+                newY = piece.y;
+                return true;
+            }
+        }
+    }
+    
+    // Si aucune correspondance n'est trouvée, la pièce peut avoir été capturée
+    return false;
+}

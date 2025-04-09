@@ -35,6 +35,9 @@ public:
     
     // Mise à jour du rendu 3D
     void updateRenderer3D();
+    
+    // Synchroniser la caméra avec la pièce sélectionnée
+    void syncCameraWithSelection();
 
 private:
     std::vector<Piece> m_list     = std::vector<Piece>(64);

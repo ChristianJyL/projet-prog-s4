@@ -6,7 +6,9 @@
 #include "../Chess/Board.hpp"
 
 Renderer3D::Renderer3D() 
-    : m_skybox(nullptr), m_chessboard(nullptr), m_pieceRenderer(nullptr), m_isInitialized(false)
+    : m_skybox(nullptr), m_chessboard(nullptr), m_pieceRenderer(nullptr), m_isInitialized(false),
+      m_selectedPiecePosition(0.0f), m_hasPieceSelected(false), m_selectedPieceColor(PieceColor::White),
+      m_selectedPieceX(0), m_selectedPieceY(0)
 {
     std::cout << "Renderer3D constructor called" << std::endl;
 }
@@ -186,6 +188,11 @@ void Renderer3D::update(float deltaTime) {
     if (m_pieceRenderer) {
         m_pieceRenderer->update(deltaTime);
     }
+    
+    // Si une pièce est sélectionnée en mode vue pièce, mettre à jour sa position
+    if (m_hasPieceSelected && m_camera.getCameraMode() == CameraMode::Piece) {
+        updateTrackedPiece();
+    }
 }
 
 void Renderer3D::cleanup() {
@@ -315,4 +322,128 @@ glm::vec3 Renderer3D::getChessBoardPosition(int x, int y) const {
     float zPos = (float)y * squareSize - 3.5f * squareSize;
     
     return glm::vec3(xPos, yPos, zPos); // y = hauteur des cases
+}
+
+bool Renderer3D::selectPieceForView(int x, int y) {
+    if (!m_isInitialized || !m_pieceRenderer) {
+        std::cerr << "ERREUR: Renderer3D non initialisé ou PieceRenderer non disponible" << std::endl;
+        return false;
+    }
+    
+    // Vérifier si la position est valide (dans l'échiquier) (normalement c'est pas sensé arriver)
+    if (x < 0 || x >= 8 || y < 0 || y >= 8) {
+        std::cout << "Position invalide pour la sélection de pièce: (" << x << ", " << y << ")" << std::endl;
+        return false;
+    }
+    
+    // Obtenir la position 3D de la case
+    glm::vec3 squarePosition = getChessBoardPosition(x, y);
+    
+    // Vérifier s'il y a une pièce à cette position
+    bool pieceFound = false;
+    PieceColor pieceColor = PieceColor::White;
+    
+    // Vérifier si la liste des pièces est vide
+    auto pieces = m_pieceRenderer->getPieces();
+    if (pieces.empty()) {
+        std::cout << "Aucune pièce disponible - la liste est vide" << std::endl;
+        return false;
+    }
+    
+    // Parcourir toutes les pièces pour trouver celle à cette position
+    for (const auto& piece : pieces) {
+        if (piece.x == x && piece.y == y) {
+            pieceFound = true;
+            pieceColor = piece.color;
+            std::cout << "Pièce trouvée à la position (" << x << ", " << y << "), couleur: " 
+                      << (pieceColor == PieceColor::White ? "Blanche" : "Noire") << std::endl;
+            break;
+        }
+    }
+    
+    if (!pieceFound) {
+        std::cout << "Aucune pièce trouvée à la position (" << x << ", " << y << ")" << std::endl;
+        return false;
+    }
+    
+    // Stocker la position et la couleur de la pièce sélectionnée
+    m_selectedPiecePosition = squarePosition;
+    m_selectedPieceColor = pieceColor;
+    m_hasPieceSelected = true;
+    m_selectedPieceX = x;
+    m_selectedPieceY = y;
+    
+    // Mettre à jour la caméra en mode pièce en tenant compte de la couleur
+    m_camera.setPieceView(m_selectedPiecePosition, m_selectedPieceColor);
+    
+    std::cout << "Pièce sélectionnée avec succès à la position (" << x << ", " << y << ")" << std::endl;
+    return true;
+}
+
+void Renderer3D::updateTrackedPiece() {
+    if (!m_hasPieceSelected || !m_pieceRenderer || !m_chessboard) {
+        return;
+    }
+    
+    float squareSize = m_chessboard->getSquareSize();
+    
+    // Vérifier si la pièce est en cours d'animation
+    if (m_pieceRenderer->isPieceAnimating(m_selectedPieceX, m_selectedPieceY)) {
+        // Obtenir la position actuelle de la pièce pendant l'animation
+        glm::vec3 currentPos = m_pieceRenderer->getPiecePosition(m_selectedPieceX, m_selectedPieceY, squareSize);
+        
+        // Mettre à jour la position de la caméra pour suivre la pièce
+        m_camera.setPieceView(currentPos, m_selectedPieceColor);
+    }
+    else {
+        // Vérifier si la pièce a changé de position après animation
+        int newX = m_selectedPieceX;
+        int newY = m_selectedPieceY;
+        
+        if (m_pieceRenderer->findNewPiecePosition(m_selectedPieceX, m_selectedPieceY, newX, newY)) {
+            // La pièce a changé de position
+            m_selectedPieceX = newX;
+            m_selectedPieceY = newY;
+            
+            // Mettre à jour la position de la caméra
+            m_selectedPiecePosition = getChessBoardPosition(newX, newY);
+            m_camera.setPieceView(m_selectedPiecePosition, m_selectedPieceColor);
+        }
+    }
+}
+
+void Renderer3D::toggleCameraMode() {
+    std::cout << "Tentative de basculement du mode caméra" << std::endl;
+    std::cout << "Mode actuel: " << (m_camera.getCameraMode() == CameraMode::Trackball ? "Trackball" : "Pièce") << std::endl;
+    std::cout << "Pièce sélectionnée: " << (m_hasPieceSelected ? "Oui" : "Non") << std::endl;
+    
+    if (m_camera.getCameraMode() == CameraMode::Trackball) {
+        // Si on est en mode trackball et qu'on veut passer en mode pièce
+        if (!m_hasPieceSelected) {
+            // Si aucune pièce n'est sélectionnée, on sélectionne automatiquement le roi blanc
+            if (selectPieceForView(4, 0)) { // Roi blanc (position 4,0)
+                std::cout << "Sélection automatique du Roi blanc pour la vue en mode pièce" << std::endl;
+            } else {
+                // En cas d'échec, on essaie avec la dame blanche
+                if (selectPieceForView(3, 0)) {
+                    std::cout << "Sélection automatique de la Dame blanche pour la vue en mode pièce" << std::endl;
+                } else {
+                    // Si on ne trouve aucune pièce valide, on ne peut pas changer de mode
+                    std::cout << "ERREUR: Aucune pièce disponible pour la vue en mode pièce" << std::endl;
+                    return;
+                }
+            }
+        }
+        
+        // Maintenant une pièce est sélectionnée, on peut changer de mode
+        std::cout << "Passage en mode pièce avec position: (" << m_selectedPiecePosition.x << ", " 
+                  << m_selectedPiecePosition.y << ", " << m_selectedPiecePosition.z << ")" << std::endl;
+        m_camera.setPieceView(m_selectedPiecePosition, m_selectedPieceColor);
+        std::cout << "Nouveau mode: " << (m_camera.getCameraMode() == CameraMode::Trackball ? "Trackball" : "Pièce") << std::endl;
+    } else {
+        // Revenir au mode trackball
+        std::cout << "Retour au mode trackball" << std::endl;
+        m_camera.toggleCameraMode();
+        std::cout << "Nouveau mode: " << (m_camera.getCameraMode() == CameraMode::Trackball ? "Trackball" : "Pièce") << std::endl;
+    }
 }

@@ -203,12 +203,34 @@ void Board::handleClick(Position pos)
 
 void Board::selectPiece(Position pos)
 {
-    Piece piece = get(pos);
-
+    Piece selectedPiece = get(pos);
+    
     // Vérifier que la pièce appartient au joueur actif
-    if (piece.type != PieceType::None && ((m_turn == PieceColor::White && piece.color == PieceColor::White) || (m_turn == PieceColor::Black && piece.color == PieceColor::Black)))
-    {
+    if (selectedPiece.type != PieceType::None && selectedPiece.color == m_turn) {
         m_selectedPiece = pos;
+        
+        //la cam sur la pièce sélectionnée
+        syncCameraWithSelection();
+    } else {
+        // Pièce de l'adversaire ou case vide, on ne fait rien
+        m_selectedPiece.reset();
+    }
+}
+
+void Board::syncCameraWithSelection()
+{
+    if (m_renderer3D && m_selectedPiece.has_value()) {
+        Position pos = m_selectedPiece.value();
+        int x = pos.x;
+        int y = pos.y;
+        
+        Camera& camera = m_renderer3D->getCamera();
+        
+        if (camera.getCameraMode() == CameraMode::Piece) {
+            // Seulement si nous sommes en mode vue pièce, sélectionner la pièce
+            m_renderer3D->selectPieceForView(x, y);
+        }
+        // En mode trackball, ne rien faire(garder la vue actuelle)
     }
 }
 

@@ -33,6 +33,60 @@ void app::update()
     
     m_renderer3D.update(deltaTime);
     
+    //FENETRE POUR LA CAM
+    if (ImGui::Begin("Camera Controls")) {
+        //Mode actuel de la cam
+        const char* cameraMode = (m_renderer3D.getCamera().getCameraMode() == CameraMode::Trackball) ? 
+                                "Mode Trackball" : "Mode Vue Pièce";
+        ImGui::Text("Mode actuel: %s", cameraMode);
+        
+        // Message d'état pour la sélection de pièce
+        if (m_renderer3D.getCamera().getCameraMode() == CameraMode::Trackball) {
+            ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), //TODO : à changer avec une variable de couleur
+                "Clic droit pour vous déplacer autour de l'échiquier");
+        } else {
+            ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), 
+                "Vue depuis la pièce - utilisez le clic droit pour regarder autour");
+        }
+        
+        // Afficher les boutons de sélection rapide des pièces directement dans le panneau principal
+        if (ImGui::CollapsingHeader("Sélectionner une pièce pour la vue", ImGuiTreeNodeFlags_DefaultOpen)) {
+            // Créer une grille de boutons pour les pièces principales
+            if (ImGui::Button("Roi blanc", ImVec2(100, 30))) {
+                if (m_renderer3D.selectPieceForView(4, 0)) {
+                    std::cout << "Pièce sélectionnée: Roi blanc" << std::endl;
+                } else {
+                    std::cout << "Échec de sélection du Roi blanc" << std::endl;
+                }
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Dame blanche", ImVec2(100, 30))) {
+                m_renderer3D.selectPieceForView(3, 0);
+            }
+            
+            if (ImGui::Button("Roi noir", ImVec2(100, 30))) {
+                m_renderer3D.selectPieceForView(4, 7);
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Dame noire", ImVec2(100, 30))) {
+                m_renderer3D.selectPieceForView(3, 7);
+            }
+        }
+        
+        // Bouton pour basculer entre les modes
+        if (ImGui::Button("Changer de mode de caméra", ImVec2(200, 30))) {
+            m_renderer3D.toggleCameraMode();
+            //std::cout << "Changement de caméra effectué" << std::endl;
+        }
+        
+        // Instructions de contrôle
+        ImGui::Separator();
+        ImGui::Text("Contrôles: Clic droit + déplacer pour tourner la caméra");
+        ImGui::Text("Molette de souris pour zoomer (mode Trackball uniquement)");
+        ImGui::Text("Touche C pour basculer rapidement entre les modes");
+    }
+    ImGui::End();
+    
     // Créer une section pour le rendu 3D
     ImGui::Begin("3D Chess Viewport", nullptr, ImGuiWindowFlags_NoScrollbar);
     
@@ -135,10 +189,12 @@ void app::update()
                 m_renderer3D.getCamera().rotateUp(mouseDelta.y * 0.01f);
             }
             
-            // Zoom avec la molette de la souris - accès direct
-            float wheel = ImGui::GetIO().MouseWheel;
-            if (wheel != 0) {
-                m_renderer3D.getCamera().moveFront(wheel * 1.0f);
+            // Zoom avec la molette de la souris - accès direct (uniquement en mode trackball)
+            if (m_renderer3D.getCamera().getCameraMode() == CameraMode::Trackball) {
+                float wheel = ImGui::GetIO().MouseWheel;
+                if (wheel != 0) {
+                    m_renderer3D.getCamera().moveFront(wheel * 1.0f);
+                }
             }
         }
     }
@@ -147,7 +203,7 @@ void app::update()
     
     // Afficher l'échiquier
     m_board.drawBoard();
-
+    
     // Variable statique pour suivre l'état de la popup
     static bool gameOverPopupClosed = false;
     
@@ -189,5 +245,10 @@ void app::update()
         }
 
         ImGui::EndPopup();
+    }
+    // raccourcis cam
+    if (ImGui::IsKeyPressed(ImGuiKey_C)) {
+        //std::cout << "Touche C pressée - basculement de mode caméra" << std::endl;
+        m_renderer3D.toggleCameraMode();
     }
 }

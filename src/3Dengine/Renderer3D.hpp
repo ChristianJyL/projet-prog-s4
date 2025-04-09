@@ -28,6 +28,12 @@ public:
     // Obtenir la position 3D d'une case de l'échiquier
     glm::vec3 getChessBoardPosition(int x, int y) const;
     
+    // Sélection d'une pièce pour la vue en mode pièce
+    bool selectPieceForView(int x, int y);
+    void toggleCameraMode();
+    
+    // Méthodes pour la gestion des pièces suivies
+    void updateTrackedPiece();
     
 private:
     // Caméra standard
@@ -38,9 +44,19 @@ private:
     PieceRenderer* m_pieceRenderer;
     bool m_isInitialized;
     
+    // Position de la pièce sélectionnée pour la vue
+    glm::vec3 m_selectedPiecePosition;
+    bool m_hasPieceSelected;
+    
+    // Couleur de la pièce sélectionnée pour la vue
+    PieceColor m_selectedPieceColor;
+    
+    // Coordonnées de la pièce sélectionnée dans l'échiquier
+    int m_selectedPieceX;
+    int m_selectedPieceY;
+    
     // Initialisation des différentes parties
     bool initializeSkybox();
     bool initializeChessboard();
     bool initializePieces();
-
 };
