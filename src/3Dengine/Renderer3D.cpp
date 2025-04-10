@@ -9,7 +9,7 @@ Renderer3D::Renderer3D()
     : m_isInitialized(false),
       m_selectedPiecePosition(0.0f), m_hasPieceSelected(false), m_selectedPieceColor(PieceColor::White),
       m_selectedPieceX(0), m_selectedPieceY(0),
-      m_chessboard(8) // Initialiser l'échiquier avec une taille de 8x8
+      m_chessboard(8) 
 {
     std::cout << "Renderer3D constructor called" << std::endl;
 }
@@ -92,8 +92,6 @@ bool Renderer3D::initializePieces() {
     std::ifstream dirCheck(modelDirPath + "/.directory_check");
     if (!dirCheck.good()) {
         std::cerr << "WARNING: The models directory may not exist: " << modelDirPath << std::endl;
-        std::cerr << "Please ensure the models are in the correct location relative to the executable." << std::endl;
-        std::cerr << "Current working directory structure should be checked." << std::endl;
     }
     
     // Charger tous les modèles
@@ -280,6 +278,7 @@ glm::vec3 Renderer3D::getChessBoardPosition(int x, int y) const {
 }
 
 bool Renderer3D::selectPieceForView(int x, int y) {
+    // Ne modifier la caméra que si on est en mode pièce
     if (!m_isInitialized) {
         return false;
     }
@@ -318,8 +317,10 @@ bool Renderer3D::selectPieceForView(int x, int y) {
     m_selectedPieceX = x;
     m_selectedPieceY = y;
     
-    // Positionner la caméra sur la pièce
-    m_camera.setPieceView(m_selectedPiecePosition, m_selectedPieceColor);
+    // Positionner la caméra sur la pièce uniquement si on est déjà en mode pièce
+    if (m_camera.getCameraMode() == CameraMode::Piece) {
+        m_camera.setPieceView(m_selectedPiecePosition, m_selectedPieceColor);
+    }
     return true;
 }
 
@@ -381,12 +382,34 @@ void Renderer3D::toggleCameraMode() {
         // Maintenant une pièce est sélectionnée, on peut changer de mode
         std::cout << "Passage en mode pièce avec position: (" << m_selectedPiecePosition.x << ", " 
                   << m_selectedPiecePosition.y << ", " << m_selectedPiecePosition.z << ")" << std::endl;
-        m_camera.setPieceView(m_selectedPiecePosition, m_selectedPieceColor);
+        m_camera.toggleCameraMode(); // Change d'abord le mode
+        m_camera.setPieceView(m_selectedPiecePosition, m_selectedPieceColor); // Puis configure la vue
         std::cout << "Nouveau mode: " << (m_camera.getCameraMode() == CameraMode::Trackball ? "Trackball" : "Pièce") << std::endl;
     } else {
-        // Revenir au mode trackball
         std::cout << "Retour au mode trackball" << std::endl;
         m_camera.toggleCameraMode();
         std::cout << "Nouveau mode: " << (m_camera.getCameraMode() == CameraMode::Trackball ? "Trackball" : "Pièce") << std::endl;
     }
+}
+
+
+// Méthodes pour la caméra
+void Renderer3D::setCameraAspectRatio(float ratio) {
+    m_camera.setAspectRatio(ratio);
+}
+
+CameraMode Renderer3D::getCameraMode() const {
+    return m_camera.getCameraMode();
+}
+
+void Renderer3D::moveCameraFront(float delta) {
+    m_camera.moveFront(delta);
+}
+
+void Renderer3D::rotateCameraLeft(float degrees) {
+    m_camera.rotateLeft(degrees);
+}
+
+void Renderer3D::rotateCameraUp(float degrees) {
+    m_camera.rotateUp(degrees);
 }

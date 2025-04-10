@@ -24,15 +24,12 @@ bool PieceRenderer::initialize() {
 }
 
 void PieceRenderer::update(float deltaTime) {
-    // Mettre à jour toutes les pièces animées
     for (auto& piece : m_pieces) {
         if (piece.state != AnimationState::Idle) {
-            // Avancer le temps d'animation
             piece.animationTime += deltaTime;
-            
-            // Vérifier si l'animation est terminée
+            // Animation terminée
             if (piece.animationTime >= piece.animationDuration) {
-                // Animation terminée
+                
                 piece.animationTime = piece.animationDuration;
                 piece.state = AnimationState::Idle;
                 
@@ -89,9 +86,9 @@ void PieceRenderer::render(const glm::mat4& view, const glm::mat4& projection, f
         // Définir la couleur de la pièce en fonction de PieceColor
         glm::vec3 color;
         if (piece.color == PieceColor::White) {
-            color = glm::vec3(0.95f, 0.95f, 0.85f); // Blanc ivoire pour les pièces blanches
+            color = glm::vec3(0.95f, 0.95f, 0.85f); // Blanc 
         } else {
-            color = glm::vec3(0.15f, 0.15f, 0.15f); // Noir profond pour les pièces noires
+            color = glm::vec3(0.15f, 0.15f, 0.15f); // Noir
         }
         
         // Si la pièce est en train d'être capturée, modifier sa couleur 
@@ -142,10 +139,12 @@ bool PieceRenderer::loadPieceModel(PieceType type, const std::string& modelPath)
             return false;
         }
         
+        /*
         std::cout << "Successfully loaded model with " 
                   << pieceGeometry.getVertexCount() << " vertices, " 
                   << pieceGeometry.getIndexCount() << " indices, and "
                   << pieceGeometry.getMeshCount() << " meshes." << std::endl;
+        */
         
         // Configurer les buffers pour ce type de pièce
         setupBuffers(type, pieceGeometry);
@@ -213,7 +212,6 @@ bool PieceRenderer::createShader() {
         if (testVertex.good() && testFragment.good()) {
             std::cout << "Shaders des pièces trouvés au chemin: " << basePath << std::endl;
             
-            // Utiliser les utilitaires existants pour charger les shaders depuis les fichiers
             glBurnout::FilePath vsPath(vertexShaderPath);
             glBurnout::FilePath fsPath(fragmentShaderPath);
             
@@ -231,7 +229,6 @@ bool PieceRenderer::createShader() {
 }
 
 void PieceRenderer::setupBuffers(PieceType type, const glBurnout::Geometry& geometry) {
-    // Créer une nouvelle entrée pour ce type de pièce
     PieceRenderData& renderData = m_pieceData[type];
     
     // Copier la géométrie
@@ -291,11 +288,8 @@ glm::vec3 PieceRenderer::calculateChessPosition(int x, int y, float squareSize) 
 glm::mat4 PieceRenderer::calculateAnimatedModelMatrix(const ChessPiece& piece, float squareSize) const {
     glm::mat4 model = glm::mat4(1.0f);
     
-    // Calculer l'offset pour centrer les pièces sur les cases
     const float pieceOffset = squareSize * 0.5f;
-    // Taille des pièces
     const float pieceScale = 7.0f;
-    // Hauteur des pièces sur l'échiquier
     const float pieceHeight = 0.1f;
     
     if (piece.state == AnimationState::Idle) {
@@ -308,7 +302,7 @@ glm::mat4 PieceRenderer::calculateAnimatedModelMatrix(const ChessPiece& piece, f
         // Animation en cours
         float t = piece.animationTime / piece.animationDuration;
         
-        // Ajout d'une courbe d'accélération/décélération (ease-in-out)
+        // Ajout d'une courbe d'accélération/décélération 
         float smoothT = t * t * (3.0f - 2.0f * t);
         
         if (piece.state == AnimationState::Moving || piece.state == AnimationState::Capturing) {
@@ -329,8 +323,8 @@ glm::mat4 PieceRenderer::calculateAnimatedModelMatrix(const ChessPiece& piece, f
                 model = glm::translate(model, currentPos);
                 model = glm::rotate(model, glm::radians(captureRotation), glm::vec3(1.0f, 0.0f, 0.0f));
             } else {
-                // Pour les mouvements normaux, trajectoire parabolique (saut)
-                float jumpFactor = 4.0f * smoothT * (1.0f - smoothT); // Fonction parabolique maximale à t=0.5
+                // Un petit saut
+                float jumpFactor = 4.0f * smoothT * (1.0f - smoothT);
                 
                 currentPos = glm::mix(piece.startPosition, piece.targetPosition, smoothT);
                 currentPos.y += piece.jumpHeight * jumpFactor;
@@ -339,6 +333,12 @@ glm::mat4 PieceRenderer::calculateAnimatedModelMatrix(const ChessPiece& piece, f
             }
         }
     }
+    
+    // Rotation pour que les pièces noires soient orientées correctement
+    if (piece.color == PieceColor::Black) {
+        model = glm::rotate(model, glm::radians(180.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    }
+    
     //TODO : AJOUTER UNE ROTATION ALEATOIRE POUR CHAQUE PIECE ? 
     
     // Mise à l'échelle pour toutes les pièces
@@ -346,7 +346,6 @@ glm::mat4 PieceRenderer::calculateAnimatedModelMatrix(const ChessPiece& piece, f
     
     return model;
 }
-
 
 void PieceRenderer::startPieceMovement(ChessPiece& piece, int targetX, int targetY, float duration) {
     piece.state = AnimationState::Moving;
@@ -528,7 +527,6 @@ bool PieceRenderer::findNewPiecePosition(int oldX, int oldY, int& newX, int& new
             }
         }
     }
-    
     // Vérifier dans l'état suivant
     if (!m_nextState.empty()) {
         for (const auto& piece : m_nextState) {
@@ -539,7 +537,6 @@ bool PieceRenderer::findNewPiecePosition(int oldX, int oldY, int& newX, int& new
             }
         }
     }
-    
     // Si aucune correspondance n'est trouvée, la pièce peut avoir été capturée
     return false;
 }
