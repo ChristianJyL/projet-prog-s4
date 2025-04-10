@@ -3,15 +3,15 @@
 #include <array>
 #include <random>
 #include <ctime>
+#include <iostream>
 
 DrunkChessMode::DrunkChessMode()
     : m_random(std::random_device()())
 {
-    std::srand(static_cast<unsigned int>(std::time(nullptr)));
-    
     // Initialiser les joueurs sobres
     m_whitePlayerState = {0.0f, 0};
     m_blackPlayerState = {0.0f, 0};
+    m_bottleCaptured = false;
 }
 
 std::string DrunkChessMode::getModeName() const {
@@ -30,6 +30,8 @@ void DrunkChessMode::initializeBoard(std::vector<Piece>& board)
     
     m_whitePlayerState = {0.0f, 0};
     m_blackPlayerState = {0.0f, 0};
+    
+    m_bottles.clear();
 }
 
 bool DrunkChessMode::isValidMove(const std::vector<Piece>& board, Position from, Position to, const Piece& piece) {
@@ -82,6 +84,19 @@ void DrunkChessMode::executeMove(std::vector<Piece>& board, Position from, Posit
     Piece capturedPiece = board[actualTo.x + actualTo.y * 8];
     bool needsPromotion = isPawnPromotion(actualTo, piece);
     
+    bool capturedBottle = hasBottleAt(actualTo);
+    float bottleAlcoholAmount = 0.0f;
+    
+    if (capturedBottle) {
+        for (const auto& bottle : m_bottles) {
+            if (bottle.position.x == actualTo.x && bottle.position.y == actualTo.y) {
+                bottleAlcoholAmount = bottle.alcoholAmount;
+                break;
+            }
+        }
+        removeBottleAt(actualTo);
+    }
+    
     GameMode::executeMove(board, from, actualTo);
     
     // Augmenter l'alcoolémie après un mouvement
@@ -94,6 +109,11 @@ void DrunkChessMode::executeMove(std::vector<Piece>& board, Position from, Posit
     // Si le joueur a promu un pion, augmenter l'alcoolémie
     if (needsPromotion) {
         alcoholIncrease += 5.0f;
+    }
+    
+    if (capturedBottle) {
+        alcoholIncrease += bottleAlcoholAmount;
+        m_bottleCaptured = true;
     }
     
     currentPlayerState.alcoholLevel += alcoholIncrease;
@@ -128,9 +148,65 @@ void DrunkChessMode::updatePerTurn(std::vector<Piece>& board, PieceColor current
     // Mise à jour des niveaux d'alcool et des états de blackout
     updateAlcoholLevels(currentTurn);
     
-    // Inclinaison du plateau proportionnelle à l'alcoolémie moyenne (pas encore implémenté)
+    // Inclinaison du plateau proportionnelle à l'alcoolémie moyenne
     float avgAlcohol = getAverageAlcoholLevel();
     m_boardEffects.boardTilt = m_normalDist(m_random) * 0.1f * (avgAlcohol / 100.0f);
+    
+    // Essayer de faire apparaître une bouteille (utilisant la loi de Bernoulli)
+    trySpawnBottle(board);
+}
+
+void DrunkChessMode::trySpawnBottle(const std::vector<Piece>& board) {
+    //std::cout << "Tentative de création d'une bouteille..." << std::endl;
+    //la loi de Bernoulli
+    if (m_bottleSpawnDist(m_random)) {
+        // Trouver les cases vides
+        std::vector<Position> emptyPositions;
+        
+        for (int y = 0; y < 8; ++y) {
+            for (int x = 0; x < 8; ++x) {
+                Position pos = {x, y};
+                if (board[pos.x + pos.y * 8].type == PieceType::None && !hasBottleAt(pos)) {
+                    emptyPositions.push_back(pos);
+                }
+            }
+        }
+        // S'il y a des cases vides, on place une bouteille
+        if (!emptyPositions.empty()) {
+            // Choisir une position aléatoire parmi les cases vides
+            int index = std::uniform_int_distribution<int>(0, static_cast<int>(emptyPositions.size()) - 1)(m_random);
+            Position bottlePos = emptyPositions[index];
+            
+            // (entre 5 et 15%)
+            float alcoholAmount = std::uniform_real_distribution<float>(5.0f, 15.0f)(m_random);
+            
+            // Ajouter la bouteille
+            //std::cout << "Bouteille créée à la position: " << bottlePos.x << ", " << bottlePos.y << std::endl;
+            m_bottles.push_back({bottlePos, alcoholAmount});
+        }
+    }
+}
+
+bool DrunkChessMode::hasBottleAt(Position pos) const {
+    for (const auto& bottle : m_bottles) {
+        if (bottle.position.x == pos.x && bottle.position.y == pos.y) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void DrunkChessMode::removeBottleAt(Position pos) {
+    m_bottles.erase(
+        std::remove_if(
+            m_bottles.begin(),
+            m_bottles.end(),
+            [pos](const Bottle& bottle) { 
+                return bottle.position.x == pos.x && bottle.position.y == pos.y; 
+            }
+        ),
+        m_bottles.end()
+    );
 }
 
 float DrunkChessMode::getPlayerAlcoholLevel(PieceColor color) const {
@@ -216,25 +292,41 @@ ImVec4 DrunkChessMode::getTileColor(bool isPairLine, int index, Position pos) co
 }
 
 void DrunkChessMode::drawTileEffect(Position pos, ImVec2 cursorPos, Piece piece) const {
-    if (piece.type == PieceType::None) return;
-    
-    float alcoholLevel = getPlayerAlcoholLevel(piece.color);
-    
-    // que si le joueur est au moins un peu bourré
-    if (alcoholLevel > 10.0f) {
-        float oscillation = std::min((alcoholLevel - 10.0f) / 90.0f, 1.0f); 
-        float time = ImGui::GetTime() * (2.0f + oscillation * 2.0f); // Oscillation plus rapide quand plus bourré
+    // Dessiner les effets des pièces qui oscillent
+    if (piece.type != PieceType::None) {
+        float alcoholLevel = getPlayerAlcoholLevel(piece.color);
         
-        // L'amplitude de l'oscillation augmente avec le niveau d'alcool
-        float offsetX = std::sin(time) * oscillation * 12.0f;
-        float offsetY = std::cos(time * 1.3f) * oscillation * 10.0f;
-        
-        // Dessiner la pièce qui oscille
-        ImGui::GetWindowDrawList()->AddText(
-            ImVec2(cursorPos.x + 25 + offsetX, cursorPos.y + 25 + offsetY),
-            piece.color == PieceColor::White ? IM_COL32(255, 255, 255, 255) : IM_COL32(0, 0, 0, 255),
-            std::string(1, piece.toChar()).c_str()
-        );
+        // que si le joueur est au moins un peu bourré
+        if (alcoholLevel > 10.0f) {
+            float oscillation = std::min((alcoholLevel - 10.0f) / 90.0f, 1.0f);
+            float time = ImGui::GetTime() * (2.0f + oscillation * 2.0f); 
+            
+            float offsetX = std::sin(time) * oscillation * 12.0f;
+            float offsetY = std::cos(time * 1.3f) * oscillation * 10.0f;
+            
+            ImGui::GetWindowDrawList()->AddText(
+                ImVec2(cursorPos.x + 25 + offsetX, cursorPos.y + 25 + offsetY),
+                piece.color == PieceColor::White ? IM_COL32(255, 255, 255, 255) : IM_COL32(0, 0, 0, 255),
+                std::string(1, piece.toChar()).c_str()
+            );
+        }
+    }
+    
+    // Dessiner les bouteilles sur les cases vides
+    for (const auto& bottle : m_bottles) {
+        if (bottle.position.x == pos.x && bottle.position.y == pos.y) {
+            // Dessiner un cercle pour représenter une bouteille
+            ImGui::GetWindowDrawList()->AddCircleFilled(
+                ImVec2(cursorPos.x + 30, cursorPos.y + 30), // pas vraiment le cercle mais il est bouré
+                15.0f,                                      
+                IM_COL32(0, 0, 255, 150)                   //  bleu 
+            );
+            ImGui::GetWindowDrawList()->AddText(
+                ImVec2(cursorPos.x + 25, cursorPos.y + 25),
+                IM_COL32(255, 255, 255, 255),
+                "B"
+            );
+        }
     }
 }
 
@@ -314,10 +406,30 @@ void DrunkChessMode::drawModeSpecificUI() {
     ImGui::Spacing();
     ImGui::Separator();
     
+    // Afficher le nombre de bouteilles sur le plateau
+    ImGui::TextColored(ImVec4(0.3f, 0.8f, 0.3f, 1.0f), "Bouteilles sur le plateau: %d", static_cast<int>(m_bottles.size()));
+    
     ImGui::TextColored(ImVec4(1,1,0,1), "Effets de l'alcool:");
     ImGui::BulletText("0-20%%: Sobre - Déplacements normaux");
     ImGui::BulletText("21-50%%: Pompette - Légère oscillation des pièces");
     ImGui::BulletText("51-80%%: Saoul - Déplacements imprécis possibles");
     ImGui::BulletText(">80%%: Risque de blackout (impossible de jouer pour 1-2 tours)");
+    ImGui::BulletText("Bouteilles: Des bouteilles d'alcool peuvent apparaître au hasard!");
+    
+    if (m_bottleCaptured) {
+        ImGui::OpenPopup("Bouteille capturée!");
+        m_bottleCaptured = false;
+    }
+    
+    if (ImGui::BeginPopupModal("Bouteille capturée !!!", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::Text("Vous avez capturé une bouteille et bu son contenu !");
+        ImGui::Text("Votre taux d'alcoolémie a augmenté!");
+        
+        if (ImGui::Button("OK", ImVec2(120, 0))) {
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+    
     ImGui::End();
 }

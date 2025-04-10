@@ -128,10 +128,7 @@ void Board::drawBoard()
         ImGui::PopID();
         
         // Dessiner les effets spécifiques au mode
-        if (piece.type != PieceType::None)
-        {
-            m_currentGameMode->drawTileEffect(pos, cursorPos, piece);
-        }
+        m_currentGameMode->drawTileEffect(pos, cursorPos, piece);
         
         drawPossibleMoves(pos, cursorPos, tileSize);
     }

@@ -135,15 +135,15 @@ void app::draw3DViewportWindow() {
 
 void app::drawGameOverPopup(bool& gameOverPopupClosed) {
     if (m_board.isGameOver() && !gameOverPopupClosed) {
-        ImGui::OpenPopup("Game Over");
+        ImGui::OpenPopup("Game Over !");
     }
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    if (ImGui::BeginPopupModal("Game Over", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    if (ImGui::BeginPopupModal("Game Over !", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         PieceColor winner = m_board.getWinner();
-        const char* winnerText = (winner == PieceColor::White) ? "White" : "Black";
-        ImGui::Text("%s wins! The king has been captured.", winnerText);
+        const char* winnerText = (winner == PieceColor::White) ? "Blanc" : "Noir";
+        ImGui::Text("%s a gagné ! Le roi a été capturé.", winnerText);
 
-        if (ImGui::Button("New Game", ImVec2(120, 0))) {
+        if (ImGui::Button("Nouvelle partie", ImVec2(120, 0))) {
             m_board = Board();
             m_board.initializeBoard(&m_renderer3D);
             
@@ -153,7 +153,7 @@ void app::drawGameOverPopup(bool& gameOverPopupClosed) {
 
         ImGui::SameLine();
 
-        if (ImGui::Button("Close", ImVec2(120, 0))) {
+        if (ImGui::Button("Fermer", ImVec2(120, 0))) {
             gameOverPopupClosed = true;
             ImGui::CloseCurrentPopup();
         }
