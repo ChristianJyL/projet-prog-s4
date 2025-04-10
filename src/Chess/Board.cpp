@@ -61,49 +61,86 @@ ImVec4 Board::getPieceColor(Piece piece) const
     return (piece.color == PieceColor::White) ? ImVec4{1.0f, 1.0f, 1.0f, 1.0f} : ImVec4{0.0f, 0.0f, 0.0f, 1.0f};
 }
 
-void Board::drawTile(int index, bool pairLine, ImVec2& outCursorPos)
+void Board::drawBoard()
 {
-    Position pos = {index % 8, index / 8};
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
+    bool pairLine = true;
 
-    ImVec4 tileColor;
-    if (m_currentGameMode)
-    {
-        //on délègue la couleur de la case à la classe de mode de jeu actuelle
-        tileColor = m_currentGameMode->getTileColor(pairLine, index, pos);
+    // Obtenir la taille disponible pour le plateau
+    ImVec2 availableSize = ImGui::GetContentRegionAvail();
+    float tileSize = availableSize.x / 8.0f;
+    ImVec2 buttonSize = ImVec2{tileSize, tileSize};
+    float totalWidth = tileSize * 8;
+    float leftPadding = (availableSize.x - totalWidth) * 0.5f;
+    if (leftPadding > 0) {
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + leftPadding);
     }
-    ImGui::PushStyleColor(ImGuiCol_Button, tileColor);
 
-    // Récupération de la pièce
-    Piece       piece      = m_list.at(index);
-    std::string label      = std::string(1, piece.toChar());
-    ImVec4      pieceColor = getPieceColor(piece);
-
-    ImGui::PushID(index);
-    ImGui::PushStyleColor(ImGuiCol_Text, pieceColor);
-
-    // Stocker la position actuelle du curseur avant d'afficher le bouton
-    outCursorPos = ImGui::GetCursorScreenPos();
-    // Taille du bouton
-    ImVec2 buttonSize = ImVec2{50.f, 50.f};
-
-    // Dessiner le bouton de la case
-    ImGui::Button(label.c_str(), buttonSize);
-
-    // Gestion des interactions souris
-    handleMouseInteraction(index);
-
-    ImGui::PopStyleColor();
-    ImGui::PopID();
-    ImGui::PopStyleColor();
-
-    // Dessiner les effets spécifiques au mode
-    if (piece.type != PieceType::None)
+    for (int i = 0; i < m_list.size(); ++i)
     {
-        m_currentGameMode->drawTileEffect(pos, outCursorPos, piece);
+        if (i % 8 == 0)
+        {
+            pairLine = !pairLine;
+            if (i > 0) {
+                // Revenir à la ligne et appliquer le padding horizontal
+                if (leftPadding > 0) {
+                    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + leftPadding);
+                }
+            }
+        }
+        else
+        {
+            ImGui::SameLine();
+        }
+
+        Position pos = {i % 8, i / 8};
+        ImVec2   cursorPos;
+        
+        // Utiliser la taille calculée pour les boutons
+        ImGui::PushID(i);
+        
+        ImVec4 tileColor;
+        if (m_currentGameMode)
+        {
+            //on délègue la couleur de la case à la classe de mode de jeu actuelle
+            tileColor = m_currentGameMode->getTileColor(pairLine, i, pos);
+        }
+        ImGui::PushStyleColor(ImGuiCol_Button, tileColor);
+        
+        // Récupération de la pièce
+        Piece       piece      = m_list.at(i);
+        std::string label      = std::string(1, piece.toChar());
+        ImVec4      pieceColor = getPieceColor(piece);
+        
+        ImGui::PushStyleColor(ImGuiCol_Text, pieceColor);
+        
+        // Stocker la position actuelle du curseur avant d'afficher le bouton
+        cursorPos = ImGui::GetCursorScreenPos();
+        
+        // Dessiner le bouton de la case avec la taille calculée
+        ImGui::Button(label.c_str(), buttonSize);
+        
+        // Gestion des interactions souris
+        handleMouseInteraction(i);
+        
+        ImGui::PopStyleColor();
+        ImGui::PopStyleColor();
+        ImGui::PopID();
+        
+        // Dessiner les effets spécifiques au mode
+        if (piece.type != PieceType::None)
+        {
+            m_currentGameMode->drawTileEffect(pos, cursorPos, piece);
+        }
+        
+        drawPossibleMoves(pos, cursorPos, tileSize);
     }
+
+    ImGui::PopStyleVar();
+    handlePawnPromotion();
 }
 
-void Board::drawPossibleMoves(Position pos, ImVec2 cursorPos)
+void Board::drawPossibleMoves(Position pos, ImVec2 cursorPos, float tileSize)
 {
     if (!m_selectedPiece)
         return;
@@ -116,41 +153,15 @@ void Board::drawPossibleMoves(Position pos, ImVec2 cursorPos)
     {
         if (move.x == pos.x && move.y == pos.y)
         {
+            float circleRadius = tileSize / 5;
+            
             ImGui::GetWindowDrawList()->AddCircleFilled(
-                ImVec2(cursorPos.x + 25, cursorPos.y + 25), // Centre du bouton
-                10.0f,                                      // Taille du cercle
-                IM_COL32(0, 255, 0, 150)                    // Vert
+                ImVec2(cursorPos.x + tileSize / 2, cursorPos.y + tileSize / 2), // Centre du cercle
+                circleRadius,                                             
+                IM_COL32(0, 255, 0, 150)                                  // Vert
             );
         }
     }
-}
-
-void Board::drawBoard()
-{
-    ImGui::Begin("Chess");
-    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
-    bool pairLine = true;
-
-    for (int i = 0; i < m_list.size(); ++i)
-    {
-        if (i % 8 == 0)
-        {
-            pairLine = !pairLine;
-        }
-        else
-        {
-            ImGui::SameLine();
-        }
-
-        Position pos = {i % 8, i / 8};
-        ImVec2   cursorPos;
-        drawTile(i, pairLine, cursorPos); 
-        drawPossibleMoves(pos, cursorPos); 
-    }
-
-    ImGui::PopStyleVar();
-    handlePawnPromotion();
-    ImGui::End();
 }
 
 void Board::handleMouseInteraction(int index)

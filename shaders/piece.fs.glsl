@@ -9,9 +9,9 @@ out vec4 FragColor;
 
 void main() {
     // Paramètres de lumière
-    vec3 lightDir = normalize(vec3(0.5, 1.0, 0.3));
-    vec3 lightColor = vec3(1.0, 1.0, 1.0);
-    
+    vec3 lightDir = normalize(vec3(-3, 1, 0.5)); 
+    vec3 lightColor = vec3(1.0, 0.9, 0.7); 
+
     // Composante ambiante
     float ambientStrength = 0.3;
     vec3 ambient = ambientStrength * pieceColor;
@@ -19,7 +19,7 @@ void main() {
     // Composante diffuse
     vec3 norm = normalize(Normal);
     float diff = max(dot(norm, lightDir), 0.0);
-    vec3 diffuse = diff * pieceColor;
+    vec3 diffuse = diff * pieceColor * lightColor; 
     
     // Résultat final
     vec3 result = ambient + diffuse;

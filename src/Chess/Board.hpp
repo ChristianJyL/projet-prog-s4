@@ -62,7 +62,7 @@ private:
     bool                  isEnPassantCapture(Position from, Position to) const;
     std::vector<Position> getValidMoves(Position from) const;
 
-    void drawPossibleMoves(Position pos, ImVec2 cursorPos);
+    void drawPossibleMoves(Position pos, ImVec2 cursorPos, float tileSize);
 
     void handlePawnPromotion();
     bool isPawnPromotion(Position from, Position to, Piece piece) const;
