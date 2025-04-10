@@ -18,14 +18,14 @@ public:
     void render();
     void cleanup();
     
-    // Accès direct à la caméra
-    Camera& getCamera() { return m_camera; }
-    const Camera& getCamera() const { return m_camera; }
+    // Méthodes déléguées pour la caméra
+    void setCameraAspectRatio(float ratio);
+    glm::mat4 getProjectionMatrix() const { return m_camera.getProjectionMatrix(); }
+    glm::mat4 getViewMatrix() const { return m_camera.getViewMatrix(); }
+    CameraMode getCameraMode() const;
+
     
-    // Méthode pour mettre à jour les pièces 3D selon l'état de l'échiquier 2D
     void updatePiecesFromBoard(const Board& board);
-    
-    // Obtenir la position 3D d'une case de l'échiquier
     glm::vec3 getChessBoardPosition(int x, int y) const;
     
     // Sélection d'une pièce pour la vue en mode pièce
@@ -35,8 +35,12 @@ public:
     // Méthodes pour la gestion des pièces suivies
     void updateTrackedPiece();
     
+    // Méthodes déléguées pour les contrôles de caméra
+    void moveCameraFront(float delta);
+    void rotateCameraLeft(float degrees);
+    void rotateCameraUp(float degrees);
+    
 private:
-    // Caméra standard
     Camera m_camera;
     
     SkyBox m_skybox;
@@ -44,18 +48,13 @@ private:
     PieceRenderer m_pieceRenderer;
     bool m_isInitialized;
     
-    // Position de la pièce sélectionnée pour la vue
     glm::vec3 m_selectedPiecePosition;
     bool m_hasPieceSelected;
-    
-    // Couleur de la pièce sélectionnée pour la vue
     PieceColor m_selectedPieceColor;
     
-    // Coordonnées de la pièce sélectionnée dans l'échiquier
     int m_selectedPieceX;
     int m_selectedPieceY;
     
-    // Initialisation des différentes parties
     bool initializeSkybox();
     bool initializeChessboard();
     bool initializePieces();

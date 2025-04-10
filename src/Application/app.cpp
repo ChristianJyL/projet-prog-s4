@@ -6,13 +6,12 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glad/glad.h>
+#include "../Chess/GameMode/ClassicChess.hpp"
+#include "../Chess/GameMode/DrunkChess.hpp"
 
 void app::init() {
-    // Initialiser dans l'ordre correct
     m_renderer3D.initialize(); 
-    m_board.setRenderer3D(&m_renderer3D);
-    m_board.initializeBoard(); 
-    m_board.updateRenderer3D();
+    m_board.initializeBoard(&m_renderer3D);
 }
 
 void app::update() {
@@ -23,15 +22,44 @@ void app::update() {
     
     m_renderer3D.update(deltaTime);
     
-    //FENETRE POUR LA CAM
-    if (ImGui::Begin("Camera Controls")) {
-        //Mode actuel de la cam
-        const char* cameraMode = (m_renderer3D.getCamera().getCameraMode() == CameraMode::Trackball) ? 
-                                "Mode Trackball" : "Mode Vue Pièce";
-        ImGui::Text("Mode actuel: %s", cameraMode);
+    static bool gameOverPopupClosed = false;
+
+    if (ImGui::Begin("Mode de Jeu")) {
+        if (ImGui::Button("Mode Classique", ImVec2(150, 30))) {
+            m_board = Board();
+            m_board.setGameMode(std::make_unique<ClassicChessMode>());
+            m_board.initializeBoard(&m_renderer3D);
+            gameOverPopupClosed = false; 
+        }
         
-        // Instructions adaptées au mode
-        if (m_renderer3D.getCamera().getCameraMode() == CameraMode::Trackball) {
+        ImGui::SameLine();
+        
+        if (ImGui::Button("Sous quelques grammes", ImVec2(200, 30))) {
+            m_board = Board();
+            m_board.setGameMode(std::make_unique<DrunkChessMode>());
+            m_board.initializeBoard(&m_renderer3D);
+            gameOverPopupClosed = false;  
+        }
+        
+        ImGui::Separator();
+        ImGui::Text("Mode actuel: %s", m_board.getCurrentModeName().c_str());
+
+        ImGui::TextColored(ImVec4(1, 0, 0, 1), "Attention: L'abus d'alcool est dangereux pour la santé!");
+        ImGui::TextColored(ImVec4(1, 0, 0, 1), "À consommer avec modération!");
+    }
+    ImGui::End();
+    
+    if (m_board.getGameMode()) {
+        m_board.getGameMode()->drawModeSpecificUI();
+    }
+
+    
+    //FENETRE POUR LA CAM
+    if (ImGui::Begin("Caméra")) {
+        const char* cameraMode = (m_renderer3D.getCameraMode() == CameraMode::Trackball) ? "Mode Trackball" : "Mode Vue Pièce";
+        ImGui::Text("Mode actuel: %s", cameraMode); 
+        
+        if (m_renderer3D.getCameraMode() == CameraMode::Trackball) {
             ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), //TODO : à changer avec une variable de couleur
                 "Clic droit pour vous déplacer autour de l'échiquier");
         } else {
@@ -62,12 +90,6 @@ void app::update() {
         if (ImGui::Button("Changer de mode caméra", ImVec2(200, 30))) {
             m_renderer3D.toggleCameraMode();
         }
-        
-        // Aide des contrôles
-        ImGui::Separator();
-        ImGui::Text("Contrôles: Clic droit + déplacer pour tourner la caméra");
-        ImGui::Text("Molette de souris pour zoomer (mode Trackball uniquement)");
-        ImGui::Text("Touche C pour basculer rapidement entre les modes");
     }
     ImGui::End();
     
@@ -76,10 +98,10 @@ void app::update() {
     ImVec2 viewportSize = ImGui::GetContentRegionAvail();
     
     if (viewportSize.x > 0 && viewportSize.y > 0) {
-        m_renderer3D.getCamera().setAspectRatio(viewportSize.x / std::max(viewportSize.y, 1.0f));
+        m_renderer3D.setCameraAspectRatio(viewportSize.x / std::max(viewportSize.y, 1.0f));
         
-        glm::mat4 view = m_renderer3D.getCamera().getViewMatrix();
-        glm::mat4 projection = m_renderer3D.getCamera().getProjectionMatrix();
+        glm::mat4 view = m_renderer3D.getViewMatrix();
+        glm::mat4 projection = m_renderer3D.getProjectionMatrix();
 
         static GLuint fbo = 0, renderTexture = 0, depthBuffer = 0;
         if (fbo == 0) {
@@ -138,15 +160,15 @@ void app::update() {
             if (ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
                 // Rotation de la caméra avec la souris
                 ImVec2 mouseDelta = ImGui::GetIO().MouseDelta;
-                m_renderer3D.getCamera().rotateLeft(-mouseDelta.x * 0.01f);
-                m_renderer3D.getCamera().rotateUp(mouseDelta.y * 0.01f);
+                m_renderer3D.rotateCameraLeft(-mouseDelta.x * 0.01f);
+                m_renderer3D.rotateCameraUp(mouseDelta.y * 0.01f);
             }
             
             // Zoom avec la molette (uniquement en mode trackball)
-            if (m_renderer3D.getCamera().getCameraMode() == CameraMode::Trackball) {
+            if (m_renderer3D.getCameraMode() == CameraMode::Trackball) {
                 float wheel = ImGui::GetIO().MouseWheel;
                 if (wheel != 0) {
-                    m_renderer3D.getCamera().moveFront(wheel * 1.0f);
+                    m_renderer3D.moveCameraFront(wheel * 1.0f);
                 }
             }
         }
@@ -158,12 +180,10 @@ void app::update() {
     m_board.drawBoard();
     
     // Gestion de la fin de partie
-    static bool gameOverPopupClosed = false;
-    
     if (m_board.isGameOver() && !gameOverPopupClosed) {
         ImGui::OpenPopup("Game Over");
     }
-
+    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     if (ImGui::BeginPopupModal("Game Over", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         PieceColor winner = m_board.getWinner();
         const char* winnerText = (winner == PieceColor::White) ? "White" : "Black";
@@ -173,9 +193,7 @@ void app::update() {
         if (ImGui::Button("New Game", ImVec2(120, 0))) {
             // Réinitialisation complète du jeu
             m_board = Board();
-            m_board.setRenderer3D(&m_renderer3D);
-            m_board.initializeBoard();
-            m_board.updateRenderer3D();
+            m_board.initializeBoard(&m_renderer3D);
             
             gameOverPopupClosed = false;
             ImGui::CloseCurrentPopup();
@@ -192,7 +210,7 @@ void app::update() {
     }
     
     // Raccourci pour changer de mode caméra
-    if (ImGui::IsKeyPressed(ImGuiKey_C)) {
+    if (ImGui::IsKeyPressed(ImGuiKey_Tab)) {
         m_renderer3D.toggleCameraMode();
     }
 }

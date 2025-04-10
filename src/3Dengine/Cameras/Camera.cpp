@@ -25,7 +25,6 @@ Camera::Camera()
 }
 
 void Camera::update(float deltaTime) {
-    // Cette méthode peut être utilisée pour des mises à jour automatiques
 }
 
 void Camera::moveFront(float delta) {
@@ -131,8 +130,7 @@ void Camera::setPieceView(const glm::vec3& piecePosition, PieceColor color) {
 
 void Camera::toggleCameraMode() {
     if (m_currentMode == CameraMode::Trackball) {
-        // Le mode pièce nécessite d'abord une sélection de pièce
-        std::cout << "Utilisez setPieceView() pour passer en mode pièce" << std::endl;
+        m_currentMode = CameraMode::Piece;
     } else {
         // Retour au mode trackball standard
         m_currentMode = CameraMode::Trackball;
