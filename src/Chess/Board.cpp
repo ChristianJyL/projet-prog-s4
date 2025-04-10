@@ -4,54 +4,56 @@
 #include <iostream>
 #include <string>
 #include <vector>
-
-constexpr ImVec4 COLOR_DARK_GREEN = ImVec4{0.0f, 0.39f, 0.0f, 1.0f}; // utiliser enum ?
-constexpr ImVec4 COLOR_BEIGE      = ImVec4{0.96f, 0.87f, 0.70f, 1.0f};
+#include "../3Dengine/Renderer3D.hpp"
+#include "GameMode/ClassicChess.hpp"
+#include "GameMode/DrunkChess.hpp"
 
 Board::Board()
+    : m_currentGameMode(std::make_unique<ClassicChessMode>()), // par défaut, le mode classique
+      m_winner(PieceColor::White) // Initialisation du vainqueur
 {
-    initializeBoard();
 }
 
-void Board::initializeBoard()
+void Board::setGameMode(std::unique_ptr<GameMode> mode)
 {
-    // Initialisation des pièces blanches
-    std::array<PieceType, 8> Pieces = {PieceType::Rook, PieceType::Knight, PieceType::Bishop, PieceType::Queen, PieceType::King, PieceType::Bishop, PieceType::Knight, PieceType::Rook};
-    for (int i = 0; i < 8; ++i)
-    {
-        m_list[i]     = {Pieces[i], PieceColor::White};
-        m_list[i + 8] = {PieceType::Pawn, PieceColor::White};
-    }
-    // Initialisation des pièces noires
-    for (int i = 0; i < 8; ++i)
-    {
-        m_list[56 + i] = {Pieces[i], PieceColor::Black};
-        m_list[48 + i] = {PieceType::Pawn, PieceColor::Black};
-    }
+    m_currentGameMode = std::move(mode);
+    m_gameOver        = false;
+    m_turn            = PieceColor::White;
+}
 
-    // Réinitialiser le suivi du dernier mouvement de pion double
+void Board::initializeBoard(Renderer3D* renderer)
+{
+    if (renderer) {
+        m_renderer3D = renderer;
+    }
+    // on délègue l'initialisation à la classe de mode de jeu actuelle
+    if (m_currentGameMode)
+    {
+        m_currentGameMode->initializeBoard(m_list);
+    }
     m_lastDoublePawnMove.reset();
+    m_renderer3D->updatePiecesFromBoard(*this);
 }
 
+//getter pour le vector
 Piece Board::get(Position pos) const
 {
     return m_list.at(pos.x + pos.y * 8);
 }
 
+//Setter pour le vector
 void Board::set(Position pos, Piece piece)
 {
     m_list.at(pos.x + pos.y * 8) = piece;
 }
 
+//Méthode pour déplacer une pièce dans le vector
 void Board::move(Position from, Position to)
 {
     set(to, get(from));
     set(from, {PieceType::None, PieceColor::White});
-}
 
-ImVec4 Board::getTileColor(bool isPairLine, int index) const
-{
-    return ((isPairLine && index % 2 == 0) || (!isPairLine && index % 2 != 0)) ? COLOR_DARK_GREEN : COLOR_BEIGE;
+    m_renderer3D->updatePiecesFromBoard(*this);
 }
 
 ImVec4 Board::getPieceColor(Piece piece) const
@@ -63,8 +65,12 @@ void Board::drawTile(int index, bool pairLine, ImVec2& outCursorPos)
 {
     Position pos = {index % 8, index / 8};
 
-    // Définition de la couleur de la case
-    ImVec4 tileColor = getTileColor(pairLine, index);
+    ImVec4 tileColor;
+    if (m_currentGameMode)
+    {
+        //on délègue la couleur de la case à la classe de mode de jeu actuelle
+        tileColor = m_currentGameMode->getTileColor(pairLine, index, pos);
+    }
     ImGui::PushStyleColor(ImGuiCol_Button, tileColor);
 
     // Récupération de la pièce
@@ -77,7 +83,6 @@ void Board::drawTile(int index, bool pairLine, ImVec2& outCursorPos)
 
     // Stocker la position actuelle du curseur avant d'afficher le bouton
     outCursorPos = ImGui::GetCursorScreenPos();
-
     // Taille du bouton
     ImVec2 buttonSize = ImVec2{50.f, 50.f};
 
@@ -90,6 +95,12 @@ void Board::drawTile(int index, bool pairLine, ImVec2& outCursorPos)
     ImGui::PopStyleColor();
     ImGui::PopID();
     ImGui::PopStyleColor();
+
+    // Dessiner les effets spécifiques au mode
+    if (piece.type != PieceType::None)
+    {
+        m_currentGameMode->drawTileEffect(pos, outCursorPos, piece);
+    }
 }
 
 void Board::drawPossibleMoves(Position pos, ImVec2 cursorPos)
@@ -101,7 +112,6 @@ void Board::drawPossibleMoves(Position pos, ImVec2 cursorPos)
     if (selectedPiece.type == PieceType::None)
         return;
 
-    // Vérifier si la case est un déplacement valide
     for (const Position& move : getValidMoves(*m_selectedPiece))
     {
         if (move.x == pos.x && move.y == pos.y)
@@ -109,9 +119,8 @@ void Board::drawPossibleMoves(Position pos, ImVec2 cursorPos)
             ImGui::GetWindowDrawList()->AddCircleFilled(
                 ImVec2(cursorPos.x + 25, cursorPos.y + 25), // Centre du bouton
                 10.0f,                                      // Taille du cercle
-                IM_COL32(0, 255, 0, 150)                    // Vert semi-transparent
+                IM_COL32(0, 255, 0, 150)                    // Vert
             );
-            break;
         }
     }
 }
@@ -120,7 +129,6 @@ void Board::drawBoard()
 {
     ImGui::Begin("Chess");
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
-
     bool pairLine = true;
 
     for (int i = 0; i < m_list.size(); ++i)
@@ -136,16 +144,12 @@ void Board::drawBoard()
 
         Position pos = {i % 8, i / 8};
         ImVec2   cursorPos;
-
-        drawTile(i, pairLine, cursorPos);  // Dessine la case et récupère sa position
-        drawPossibleMoves(pos, cursorPos); // Affiche les déplacements possibles
+        drawTile(i, pairLine, cursorPos); 
+        drawPossibleMoves(pos, cursorPos); 
     }
 
     ImGui::PopStyleVar();
-
-    // Gérer la promotion des pions
     handlePawnPromotion();
-
     ImGui::End();
 }
 
@@ -157,13 +161,12 @@ void Board::handleMouseInteraction(int index)
     }
     else if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
     {
-        m_selectedPiece.reset(); // Handle right-click action
+        m_selectedPiece.reset(); 
     }
 }
 
 void Board::handleClick(Position pos)
 {
-    // Ne pas permettre les interactions pendant la promotion
     if (m_promotionInProgress)
         return;
 
@@ -192,15 +195,35 @@ void Board::handleClick(Position pos)
 
 void Board::selectPiece(Position pos)
 {
-    Piece piece = get(pos);
+    Piece selectedPiece = get(pos);
 
     // Vérifier que la pièce appartient au joueur actif
-    if (piece.type != PieceType::None && ((m_turn == PieceColor::White && piece.color == PieceColor::White) || (m_turn == PieceColor::Black && piece.color == PieceColor::Black)))
+    if (selectedPiece.type != PieceType::None && selectedPiece.color == m_turn)
     {
         m_selectedPiece = pos;
+        // la cam sur la pièce sélectionnée
+        syncCameraWithSelection();
+    }
+    else
+    {
+        // Pièce de l'adversaire ou case vide, on ne fait rien
+        m_selectedPiece.reset();
     }
 }
 
+void Board::syncCameraWithSelection()
+{
+    if (m_renderer3D && m_selectedPiece.has_value())
+    {
+        Position pos = m_selectedPiece.value();
+        // Ne synchroniser la caméra que si elle est déjà en mode pièce
+        if (m_renderer3D->getCameraMode() == CameraMode::Piece) {
+            m_renderer3D->selectPieceForView(pos.x, pos.y);
+        }
+    }
+}
+
+//Vérifier si une pièce bloque le passage
 bool Board::isPathClear(Position from, Position to) const
 {
     int dx = to.x - from.x;
@@ -245,10 +268,6 @@ bool Board::isEnPassantCapture(Position from, Position to) const
     if (abs(dx) != 1 || dy != direction)
         return false;
 
-    // Vérifier si la case cible est vide (ce qui est inhabituel pour une capture)
-    if (get(to).type != PieceType::None)
-        return false;
-
     // Vérifier si la position cible est directement derrière le pion qui a fait un double mouvement
     Position pawnPos   = *m_lastDoublePawnMove;
     int      expectedY = (piece.color == PieceColor::White) ? 4 : 3; // Le pion capturé doit être sur la 5e ou 4e rangée
@@ -286,151 +305,185 @@ void Board::movePiece(Position pos)
     Piece    piece       = get(from);
     Piece    targetPiece = get(pos);
 
-    // Réinitialiser le suivi du dernier mouvement de pion double
-    bool isPawnDoubleMove = false;
-
-    // Vérification spéciale pour le déplacement diagonal du pion
-    if (piece.type == PieceType::Pawn && abs(pos.x - from.x) == 1)
-    {
-        // Vérifier si c'est une capture en passant
-        if (isEnPassantCapture(from, pos))
-        {
-            // Déterminer la position du pion à capturer
-            Position capturedPawnPos = {pos.x, from.y};
-            // Vider la case du pion capturé
-            set(capturedPawnPos, {PieceType::None, PieceColor::White});
-        }
-        // Capture normale: un pion ne peut se déplacer en diagonale que s'il y a une pièce ennemie à capturer
-        else if (targetPiece.type == PieceType::None || targetPiece.color == piece.color)
-        {
-            m_selectedPiece.reset(); // Annuler la sélection
-            return;
-        }
-    }
-
-    // Vérifier si le déplacement est valide
-    if (!piece.isMoveValid(from, pos))
-    {
-        m_selectedPiece.reset(); // Annuler la sélection
-        return;
-    }
-
-    // Vérifier s'il s'agit d'un mouvement de deux cases pour un pion
-    if (piece.type == PieceType::Pawn && abs(pos.y - from.y) == 2)
-    {
-        isPawnDoubleMove = true;
-    }
-
-    // Vérifier s'il y a un obstacle (uniquement pour Tour, Fou, et Reine)
-    if ((piece.type == PieceType::Rook || piece.type == PieceType::Bishop || piece.type == PieceType::Queen) && !isPathClear(from, pos))
+    // Vérifier d'abord si le mouvement est valide (selon les règles classico)
+    if (!m_currentGameMode->isValidMove(m_list, from, pos, piece))
     {
         m_selectedPiece.reset();
         return;
     }
+        
+    bool isPawnDoubleMove = false;
 
-    // Vérifier si la case est occupée par une pièce adverse ou libre
-    if (targetPiece.type == PieceType::None || targetPiece.color != piece.color)
+    //Maintenant, on vérifie les cas spécials
+    if (piece.type == PieceType::Pawn && abs(pos.x - from.x) == 1)
     {
-        // On vérifie si le roi est capturé
-        if (targetPiece.type == PieceType::King)
+        if (isEnPassantCapture(from, pos))
         {
-            std::cout << "King captured! Game over." << std::endl; // Debug output
-            piece.hasMoved = true;                                 // Marquer la pièce comme ayant bougé
-            set(pos, piece);                                       // Déplacer la pièce
-            set(from, {PieceType::None, PieceColor::White});       // Vider l'ancienne case
-
-            // Mettre à jour l'état du jeu
-            m_gameOver = true;
-            m_winner   = piece.color;
-
-            // Réinitialiser la sélection et ne pas vérifier la promotion
-            m_selectedPiece.reset();
-            m_lastDoublePawnMove.reset();
+            // Déterminer la position du pion à capturer
+            Position capturedPawnPos = {pos.x, from.y};
+            // Exécuter un mouvement en passant
+            move(from, pos);
+            set(capturedPawnPos, {PieceType::None, PieceColor::White});
+        }
+        // Capture normale: un pion ne peut se déplacer en diagonale que s'il y a une pièce ennemie à capturer
+        else if (targetPiece.type == PieceType::None)
+        {
+            m_selectedPiece.reset(); // Annuler la sélection
             return;
         }
-
-        piece.hasMoved = true;                           // Marquer la pièce comme ayant bougé
-        set(pos, piece);                                 // Déplacer la pièce
-        set(from, {PieceType::None, PieceColor::White}); // Vider l'ancienne case
-
-        // Si c'était un mouvement de deux cases pour un pion, mettre à jour m_lastDoublePawnMove
-        if (isPawnDoubleMove)
-        {
-            m_lastDoublePawnMove = pos;
-        }
         else
         {
-            m_lastDoublePawnMove.reset(); // Réinitialiser pour tout autre mouvement
-        }
-
-        // Vérifier si le pion doit être promu
-        if (isPawnPromotion(from, pos, piece))
-        {
-            m_promotionInProgress = true;
-            m_promotionPosition   = pos;
-            m_promotionColor      = piece.color;
-            // Ne pas changer de tour tant que la promotion n'est pas résolue
-        }
-        else
-        {
-            nextTurn(); // Changer le tour si pas de promotion
+            // Déléguer au mode de jeu
+            m_currentGameMode->executeMove(m_list, from, pos);
         }
     }
+    else
+    {
+        // Déléguer au mode de jeu pour les autres types de mouvements
+        m_currentGameMode->executeMove(m_list, from, pos);
+    }
 
-    m_selectedPiece.reset(); // Désélectionner la pièce après le déplacement
+    // Vérifier s'il s'agit d'un mouvement de deux cases pour un pion
+    if (piece.type == PieceType::Pawn)
+    {
+        int dy = pos.y - from.y;
+        if (abs(dy) == 2)
+        {
+            m_lastDoublePawnMove = pos;
+            isPawnDoubleMove = true;
+        }
+        else
+        {
+            m_lastDoublePawnMove.reset(); 
+        }
+    }
+    else
+    {
+        m_lastDoublePawnMove.reset();
+    }
+
+    m_renderer3D->updatePiecesFromBoard(*this);
+
+    if (targetPiece.type == PieceType::King){
+        m_gameOver = true;
+        m_winner = piece.color; 
+        m_promotionInProgress = false;
+    }
+
+    // Gérer la promotion de pion seulement si le jeu n'est pas terminé
+    if (isPawnPromotion(from, pos, piece) && !m_gameOver)
+    {
+        m_promotionInProgress = true;
+        m_promotionPosition   = pos;
+        m_promotionColor      = piece.color;
+    }
+    else if (!m_gameOver)
+    {
+        nextTurn();
+    }
+
+    m_selectedPiece.reset(); 
+}
+
+void Board::executeMove(Position from, Position to)
+{
+    Piece piece = get(from);
+    bool isEnPassant = isEnPassantCapture(from, to);
+    Position capturedPawnPos;
+
+    if (isEnPassant)
+    {
+        capturedPawnPos = {to.x, from.y}; // Le pion à capturer est sur la même rangée que notre pion
+    }
+
+    // Exécuter le mouvement
+    move(from, to);
+
+    // Si c'était une capture en passant, enlever le pion capturé
+    if (isEnPassant)
+    {
+        set(capturedPawnPos, {PieceType::None, PieceColor::White});
+    }
+
+    // Mettre à jour m_lastDoublePawnMove si c'était un double mouvement de pion
+    if (piece.type == PieceType::Pawn)
+    {
+        int dy = to.y - from.y;
+        if (abs(dy) == 2)
+        {
+            m_lastDoublePawnMove = to;
+        }
+        else
+        {
+            m_lastDoublePawnMove.reset(); 
+        }
+    }
+    else
+    {
+        m_lastDoublePawnMove.reset(); 
+    }
+
+    m_renderer3D->updatePiecesFromBoard(*this);
 }
 
 void Board::nextTurn()
 {
     m_turn = (m_turn == PieceColor::White) ? PieceColor::Black : PieceColor::White;
+
+    if (m_currentGameMode)
+    {
+        m_currentGameMode->updatePerTurn(m_list, m_turn);
+    }
 }
 
 void Board::handlePawnPromotion()
 {
-    if (!m_promotionInProgress)
+    // Ne pas ouvrir la fenêtre de promotion si le jeu est terminé
+    if (!m_promotionInProgress || m_gameOver)
         return;
 
-    // Centrer la fenêtre modale
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
 
-    if (ImGui::BeginPopupModal("Pawn Promotion", NULL, ImGuiWindowFlags_AlwaysAutoResize))
+    if (ImGui::BeginPopupModal("Promotion de pion", NULL, ImGuiWindowFlags_AlwaysAutoResize))
     {
-        ImGui::Text("Choose a piece for promotion:");
+        ImGui::Text("Choisissez une pièce pour la promotion :\n\n");
 
-        // Les options de promotion (Dame, Tour, Fou, Cavalier)
         std::array<std::pair<PieceType, const char*>, 4> options = {
-            std::make_pair(PieceType::Queen, "Queen"),
-            std::make_pair(PieceType::Rook, "Rook"),
-            std::make_pair(PieceType::Bishop, "Bishop"),
-            std::make_pair(PieceType::Knight, "Knight")
+            std::make_pair(PieceType::Queen, "Reine"),
+            std::make_pair(PieceType::Rook, "Tour"),
+            std::make_pair(PieceType::Bishop, "Fou"),
+            std::make_pair(PieceType::Knight, "Cavalier")
         };
 
         for (auto& [type, name] : options)
         {
             if (ImGui::Button(name, ImVec2(100, 40)))
             {
-                // Promouvoir le pion en la pièce choisie
                 set(m_promotionPosition, {type, m_promotionColor});
 
-                // Réinitialiser l'état de promotion
+                m_renderer3D->updatePiecesFromBoard(*this);
+
                 m_promotionInProgress = false;
                 ImGui::CloseCurrentPopup();
 
-                // Passer au tour suivant maintenant que la promotion est terminée
-                nextTurn();
+                if (!m_gameOver) {
+                    nextTurn();
+                }
             }
         }
 
         ImGui::EndPopup();
     }
 
-    // Ouvrir la fenêtre modale si une promotion est en cours
-    if (m_promotionInProgress)
+    // Ouvrir la fenêtre modale si une promotion est en cours et que le jeu n'est pas terminé
+    if (m_promotionInProgress && !m_gameOver)
     {
-        ImGui::OpenPopup("Pawn Promotion");
+        ImGui::OpenPopup("Promotion de pion");
     }
 }
 
+//Uniquement visuel
+//Pour avoir la liste des positions valides pour un mouvement
 std::vector<Position> Board::getValidMoves(Position from) const
 {
     std::vector<Position> moves;
@@ -448,9 +501,14 @@ std::vector<Position> Board::getValidMoves(Position from) const
         // Si le pion est adjacent au pion qui a fait un double mouvement et sur la bonne rangée
         if (from.y == expectedY && abs(from.x - pawnPos.x) == 1 && pawnPos.y == from.y)
         {
-            // Ajouter la position de capture en passant
-            Position enPassantPos = {pawnPos.x, from.y + direction};
-            moves.push_back(enPassantPos);
+            // Vérifier que c'est bien un pion ennemi
+            Piece possiblePawn = get(pawnPos);
+            if (possiblePawn.type == PieceType::Pawn && possiblePawn.color != piece.color)
+            {
+                // Ajouter la position de capture en passant
+                Position enPassantPos = {pawnPos.x, from.y + direction};
+                moves.push_back(enPassantPos);
+            }
         }
     }
 
@@ -462,12 +520,38 @@ std::vector<Position> Board::getValidMoves(Position from) const
             Position to = {x, y};
 
             // Vérification spéciale pour les pions qui se déplacent en diagonale
-            if (piece.type == PieceType::Pawn && abs(to.x - from.x) == 1)
+            if (piece.type == PieceType::Pawn && abs(to.x - from.x) == 1 )
             {
+                int dy        = to.y - from.y;
+                int direction = (piece.color == PieceColor::White) ? 1 : -1;
+
+                // Vérifier que c'est bien un mouvement diagonal vers l'avant
+                if (dy != direction)
+                {
+                    continue;
+                }
+
                 Piece targetPiece = get(to);
                 // Un pion ne peut aller en diagonale que s'il y a une pièce ennemie
-                if (targetPiece.type == PieceType::None && !isEnPassantCapture(from, to))
-                    continue;
+                if (targetPiece.type == PieceType::None)
+                {
+                    continue; // Pas de pièce à capturer, on ne peut pas aller en diagonale ici
+                }
+                else if (targetPiece.color == piece.color)
+                {
+                    continue; // Ne peut pas capturer sa propre couleur
+                }
+            }
+
+            //si il y a un ennemi devant un pion qui avance de deux cases
+            if (piece.type == PieceType::Pawn && abs(to.x - from.x) == 0 && abs(to.y - from.y) == 2)
+            {
+                Position middlePos = {from.x, from.y + ((piece.color == PieceColor::White) ? 1 : -1)};
+                Piece    middlePiece = get(middlePos);
+                if (middlePiece.type != PieceType::None)
+                {
+                    continue; // Une pièce bloque le passage
+                }
             }
 
             if (!piece.isMoveValid(from, to))
@@ -489,4 +573,20 @@ std::vector<Position> Board::getValidMoves(Position from) const
         }
     }
     return moves;
+}
+
+std::string Board::getCurrentModeName() const
+{
+    if (!m_currentGameMode)
+    {
+        return "Aucun";
+    }
+
+    return m_currentGameMode->getModeName();
+}
+    
+
+PieceColor Board::getWinner() const
+{
+    return m_winner;
 }

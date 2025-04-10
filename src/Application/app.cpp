@@ -3,52 +3,214 @@
 #include <iostream>
 #include <string>
 #include "Chess/Board.hpp"
-#include "quick_imgui/quick_imgui.hpp"
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glad/glad.h>
+#include "../Chess/GameMode/ClassicChess.hpp"
+#include "../Chess/GameMode/DrunkChess.hpp"
 
-void app::run()
-{
-    quick_imgui::loop(
-        "Chess",
-        {
-            .init                     = [&]() { m_board = Board(); },
-            .loop                     = [&]() {
-                m_board.drawBoard();
+void app::init() {
+    m_renderer3D.initialize(); 
+    m_board.initializeBoard(&m_renderer3D);
+}
 
-                // Afficher un message si la partie est terminée
-            if (m_board.isGameOver())
-            {
-                std::cout << "Game is over, opening popup" << std::endl; // Debug output
-                ImGui::OpenPopup("Game Over");
+void app::update() {
+    static float lastFrameTime = (float)glfwGetTime();
+    float currentTime = (float)glfwGetTime();
+    float deltaTime = currentTime - lastFrameTime;
+    lastFrameTime = currentTime;
+    
+    m_renderer3D.update(deltaTime);
+    
+    static bool gameOverPopupClosed = false;
+
+    if (ImGui::Begin("Mode de Jeu")) {
+        if (ImGui::Button("Mode Classique", ImVec2(150, 30))) {
+            m_board = Board();
+            m_board.setGameMode(std::make_unique<ClassicChessMode>());
+            m_board.initializeBoard(&m_renderer3D);
+            gameOverPopupClosed = false; 
+        }
+        
+        ImGui::SameLine();
+        
+        if (ImGui::Button("Sous quelques grammes", ImVec2(200, 30))) {
+            m_board = Board();
+            m_board.setGameMode(std::make_unique<DrunkChessMode>());
+            m_board.initializeBoard(&m_renderer3D);
+            gameOverPopupClosed = false;  
+        }
+        
+        ImGui::Separator();
+        ImGui::Text("Mode actuel: %s", m_board.getCurrentModeName().c_str());
+
+        ImGui::TextColored(ImVec4(1, 0, 0, 1), "Attention: L'abus d'alcool est dangereux pour la santé!");
+        ImGui::TextColored(ImVec4(1, 0, 0, 1), "À consommer avec modération!");
+    }
+    ImGui::End();
+    
+    if (m_board.getGameMode()) {
+        m_board.getGameMode()->drawModeSpecificUI();
+    }
+
+    
+    //FENETRE POUR LA CAM
+    if (ImGui::Begin("Caméra")) {
+        const char* cameraMode = (m_renderer3D.getCameraMode() == CameraMode::Trackball) ? "Mode Trackball" : "Mode Vue Pièce";
+        ImGui::Text("Mode actuel: %s", cameraMode); 
+        
+        if (m_renderer3D.getCameraMode() == CameraMode::Trackball) {
+            ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), //TODO : à changer avec une variable de couleur
+                "Clic droit pour vous déplacer autour de l'échiquier");
+        } else {
+            ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), 
+                "Vue depuis la pièce - utilisez le clic droit pour regarder autour");
+        }
+        
+        // Sélection rapide des pièces
+        if (ImGui::CollapsingHeader("Sélectionner une pièce pour la vue", ImGuiTreeNodeFlags_DefaultOpen)) {
+            if (ImGui::Button("Roi blanc", ImVec2(100, 30))) {
+                m_renderer3D.selectPieceForView(4, 0);
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Dame blanche", ImVec2(100, 30))) {
+                m_renderer3D.selectPieceForView(3, 0);
             }
             
-            //Popup modal
-            if (ImGui::BeginPopupModal("Game Over", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
-            {
-                PieceColor winner = m_board.getWinner();
-                const char* winnerText = (winner == PieceColor::White) ? "White" : "Black";
-                ImGui::Text("%s wins! The king has been captured.", winnerText);
-                
-                if (ImGui::Button("New Game", ImVec2(120, 0)))
-                {
-                    m_board = Board(); 
-                    ImGui::CloseCurrentPopup();
-                    std::cout << "Starting new game" << std::endl; 
-                }
-                
-                ImGui::SameLine();
-                
-                if (ImGui::Button("Close", ImVec2(120, 0)))
-                {
-                    ImGui::CloseCurrentPopup();
-                }
-                
-                ImGui::EndPopup();
-            } },
-            .key_callback             = [](int key, int scancode, int action, int mods) { std::cout << "Key: " << key << " Scancode: " << scancode << " Action: " << action << " Mods: " << mods << '\n'; },
-            .mouse_button_callback    = [](int button, int action, int mods) { std::cout << "Button: " << button << " Action: " << action << " Mods: " << mods << '\n'; },
-            .cursor_position_callback = [](double xpos, double ypos) { std::cout << "Position: " << xpos << ' ' << ypos << '\n'; },
-            .scroll_callback          = [](double xoffset, double yoffset) { std::cout << "Scroll: " << xoffset << ' ' << yoffset << '\n'; },
-            .window_size_callback     = [](int width, int height) { std::cout << "Resized: " << width << ' ' << height << '\n'; },
+            if (ImGui::Button("Roi noir", ImVec2(100, 30))) {
+                m_renderer3D.selectPieceForView(4, 7);
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Dame noire", ImVec2(100, 30))) {
+                m_renderer3D.selectPieceForView(3, 7);
+            }
         }
-    );
+        
+        // Bouton pour changer de mode caméra
+        if (ImGui::Button("Changer de mode caméra", ImVec2(200, 30))) {
+            m_renderer3D.toggleCameraMode();
+        }
+    }
+    ImGui::End();
+    
+    // Fenêtre du rendu 3D
+    ImGui::Begin("3D Chess Viewport", nullptr, ImGuiWindowFlags_NoScrollbar);
+    ImVec2 viewportSize = ImGui::GetContentRegionAvail();
+    
+    if (viewportSize.x > 0 && viewportSize.y > 0) {
+        m_renderer3D.setCameraAspectRatio(viewportSize.x / std::max(viewportSize.y, 1.0f));
+        
+        glm::mat4 view = m_renderer3D.getViewMatrix();
+        glm::mat4 projection = m_renderer3D.getProjectionMatrix();
+
+        static GLuint fbo = 0, renderTexture = 0, depthBuffer = 0;
+        if (fbo == 0) {
+            // Création initiale des ressources de rendu
+            glGenFramebuffers(1, &fbo);
+            glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+            
+            // Texture pour le résultat coloré
+            glGenTextures(1, &renderTexture);
+            glBindTexture(GL_TEXTURE_2D, renderTexture);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, (int)viewportSize.x, (int)viewportSize.y, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, renderTexture, 0);
+            
+            // Buffer de profondeur
+            glGenRenderbuffers(1, &depthBuffer);
+            glBindRenderbuffer(GL_RENDERBUFFER, depthBuffer);
+            glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, (int)viewportSize.x, (int)viewportSize.y);
+            glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depthBuffer);
+            
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        }
+        
+        // Gestion du redimensionnement
+        static ImVec2 lastSize = viewportSize;
+        if (lastSize.x != viewportSize.x || lastSize.y != viewportSize.y) {
+            glBindTexture(GL_TEXTURE_2D, renderTexture);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, (int)viewportSize.x, (int)viewportSize.y, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+            
+            glBindRenderbuffer(GL_RENDERBUFFER, depthBuffer);
+            glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, (int)viewportSize.x, (int)viewportSize.y);
+            
+            lastSize = viewportSize;
+        }
+        
+        // Rendu de la scène dans le framebuffer
+        glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+        glViewport(0, 0, (int)viewportSize.x, (int)viewportSize.y);
+        
+        if (m_renderer3D.isInitialized()) {
+            try {
+                m_renderer3D.render();
+            } catch (const std::exception& e) {
+                std::cerr << "Erreur lors du rendu: " << e.what() << std::endl;
+            }
+        }
+        
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        
+        // Affichage du résultat dans ImGui
+        ImGui::Image((void*)(intptr_t)renderTexture, viewportSize, ImVec2(0, 1), ImVec2(1, 0));
+        
+        // Gestion des contrôles de la caméra
+        if (ImGui::IsItemHovered() && !ImGui::IsAnyItemActive()) {
+            if (ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
+                // Rotation de la caméra avec la souris
+                ImVec2 mouseDelta = ImGui::GetIO().MouseDelta;
+                m_renderer3D.rotateCameraLeft(-mouseDelta.x * 0.01f);
+                m_renderer3D.rotateCameraUp(mouseDelta.y * 0.01f);
+            }
+            
+            // Zoom avec la molette (uniquement en mode trackball)
+            if (m_renderer3D.getCameraMode() == CameraMode::Trackball) {
+                float wheel = ImGui::GetIO().MouseWheel;
+                if (wheel != 0) {
+                    m_renderer3D.moveCameraFront(wheel * 1.0f);
+                }
+            }
+        }
+    }
+    
+    ImGui::End();
+    
+    // Affichage de l'échiquier 2D
+    m_board.drawBoard();
+    
+    // Gestion de la fin de partie
+    if (m_board.isGameOver() && !gameOverPopupClosed) {
+        ImGui::OpenPopup("Game Over");
+    }
+    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    if (ImGui::BeginPopupModal("Game Over", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        PieceColor winner = m_board.getWinner();
+        const char* winnerText = (winner == PieceColor::White) ? "White" : "Black";
+        ImGui::Text("%s wins! The king has been captured.", winnerText);
+
+        // Options de fin de partie
+        if (ImGui::Button("New Game", ImVec2(120, 0))) {
+            // Réinitialisation complète du jeu
+            m_board = Board();
+            m_board.initializeBoard(&m_renderer3D);
+            
+            gameOverPopupClosed = false;
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::SameLine();
+
+        if (ImGui::Button("Close", ImVec2(120, 0))) {
+            gameOverPopupClosed = true;
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::EndPopup();
+    }
+    
+    // Raccourci pour changer de mode caméra
+    if (ImGui::IsKeyPressed(ImGuiKey_Tab)) {
+        m_renderer3D.toggleCameraMode();
+    }
 }
